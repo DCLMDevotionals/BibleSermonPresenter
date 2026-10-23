@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS Display Output</title>
+  <script src="default-styles.js"></script>
+  <script src="display-renderer.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background-color: #121218;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      
+    }
+
+    #display-container { 
+      opacity: 0; 
+      transition: opacity 600ms ease; 
+    }
+
+    #display-container.visible { 
+      opacity: 1;
+    }
+    .title {display: none; color: #007acc; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; width: 100%; }
+    .content { color: #fff; font-size: 2.2rem; line-height: 1.4; font-weight: 500; width: 100%; white-space: pre-wrap; }
+    .content b, .title b { font-weight: bold; } .content i, .title i { font-style: italic; }
+    .content u, .title u { text-decoration: underline; text-underline-offset: 4px; }
+  </style>
+  <style id="dynamic-obs-styles"></style>
+</head>
+<body>
+  <div id="display-container"><div id="title" class="title"></div><div id="content" class="content"></div></div>
+  <script>
+  (() => {
+    'use strict';
+    const CHANNEL_NAME = 'bible_sermon_pro_sync_v1';
+    const container = document.getElementById('display-container');
+    const titleElem = document.getElementById('title');
+    const contentElem = document.getElementById('content');
+    const obsStyleElem = document.getElementById('dynamic-obs-styles');
+    let channel = null;
+    let lastSeq = -1;
+    let lastCurrentRaw = null;
+    let lastBroadcastRaw = null;
+    let currentAnim = { type: 'fade', duration: 600 };
+    let fallbackBgColor = '#121218';
+    let currentScreenConfig = {
+      enabled: true,
+      partCss: `position: absolute;\ntop: 50%;\nleft: 50%;\ntransform: translate(-50%, -50%);\nwidth: 85%;\nmax-width: 1200px;\nbackground: rgba(0, 0, 0, .75);\nborder-radius: 8px;\npadding: 30px 40px;\n/* backdrop-filter: blur(8px); */\ndisplay: flex;\nflex-direction: column;\njustify-content: center;\nalign-items: center;\nmin-height: 140px;\nopacity: 0;\ntransition: opacity 600ms ease;`,
+      fullCss: `bottom: 3%;\nleft: 50%;\ntransform: translateX(-50%);\nwidth: 85%;\nmax-width: 1200px;\nbackground: rgba(18, 18, 24, 0.92);\nborder-radius: 8px;\npadding: 30px 40px;\nbox-shadow: 0 20px 40px rgba(0,0,0,.6);\nbackdrop-filter: blur(8px);\ndisplay: flex;\nflex-direction: column;\njustify-content: center;\nalign-items: center;\nmin-height: 140px;\nopacity: 0;\ntransition: opacity 600ms ease;`
+    };
+
+    function log(action, details) { console.log('[MyPlugin-Display] ' + action, details ?? ''); }
+
+    function applyDefaultObsStyles() {
+      let css = '';
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      Object.keys(defaults).forEach(cls => { css += `#display-container .${cls} { ${defaults[cls]} }\n`; });
+      obsStyleElem.textContent = css;
+    }
+
+    function applyCssRules(cssRules) {
+      if (typeof cssRules !== 'string') return;
+      let css = '';
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      Object.keys(defaults).forEach(cls => { css += `#display-container .${cls} { ${defaults[cls]} }\n`; });
+      css += cssRules.replace(/(\.[a-zA-Z0-9_-]+)/g, '#display-container \$1');
+      obsStyleElem.textContent = css;
+    }
+
+    function applyAnimationTransition(anim) {
+      if (!anim) return;
+      currentAnim = anim;
+      const dur = (anim.duration !== undefined) ? parseInt(anim.duration, 10) : 600;
+      if (dur <= 0) {
+        container.style.transition = 'none';
+      } else {
+        container.style.transition = `opacity ${dur}ms ease`;
+      }
+    }
+
+    function applyScreenConfig(config) {
+      if (!config) return;
+      currentScreenConfig = config;
+      window.BibleSermonDisplayRenderer.setScreenConfig(container, config);
+    }
+
+    function applyBackgroundImage(bgConfig) {
+      if (!bgConfig) return;
+      window.BibleSermonDisplayRenderer.setBackground(document.body, bgConfig, fallbackBgColor);
+    }
+
+    function handleMessage(data) {
+      if (!data || typeof data !== 'object') return;
+      if (typeof data.seq === 'number') {
+        if (data.seq <= lastSeq) return;
+        lastSeq = data.seq;
+      }
+      log('Received ' + data.type, data);
+
+      if (data.animation) {
+        applyAnimationTransition(data.animation);
+      }
+
+      if (data.screenConfig) {
+        applyScreenConfig(data.screenConfig);
+      }
+
+      requestAnimationFrame(() => {
+        if (data.type === 'UPDATE') {
+          const dur = (currentAnim && currentAnim.duration !== undefined) ? parseInt(currentAnim.duration, 10) : 600;
+          
+          if (dur <= 0) {
+            container.style.transition = 'none';
+            container.style.opacity = '1';
+            window.BibleSermonDisplayRenderer.setSlide(container, data, {});
+            if (data.bgColor) {
+              fallbackBgColor = data.bgColor;
+              if (document.body.style.backgroundImage === 'none' || !document.body.style.backgroundImage) {
+                document.body.style.backgroundColor = data.bgColor;
+              }
+            }
+            container.classList.add('visible');
+          } else {
+            container.style.transition = `opacity ${dur}ms ease`;
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+              window.BibleSermonDisplayRenderer.setSlide(container, data, {});
+              if (data.bgColor) {
+                fallbackBgColor = data.bgColor;
+                if (document.body.style.backgroundImage === 'none' || !document.body.style.backgroundImage) {
+                  document.body.style.backgroundColor = data.bgColor;
+                }
+              }
+              
+              container.style.opacity = '1';
+              container.classList.add('visible');
+            }, dur / 2);
+          }
+        } else if (data.type === 'CLEAR') {
+          container.classList.remove('visible');
+        } else if (data.type === 'COLOR_UPDATE') {
+          if (data.bgColor) {
+            fallbackBgColor = data.bgColor;
+            if (document.body.style.backgroundImage === 'none' || !document.body.style.backgroundImage) {
+              document.body.style.backgroundColor = data.bgColor;
+            }
+          }
+        } else if (data.type === 'BG_CUSTOM_CSS_UPDATE') {
+          if (data.bgCss) {
+            document.body.style.cssText = data.bgCss;
+          }
+        } else if (data.type === 'BG_IMAGE_UPDATE') {
+          if (data.background) {
+            applyBackgroundImage(data.background);
+          }
+        } else if (data.type === 'CSS_UPDATE') {
+          if (data.cssRules) applyCssRules(data.cssRules);
+        } else if (data.type === 'ANIMATION_UPDATE') {
+          if (data.animation) applyAnimationTransition(data.animation);
+        } else if (data.type === 'SCREEN_CONFIG_UPDATE') {
+          if (data.screenConfig) applyScreenConfig(data.screenConfig);
+        }
+      });
+    }
+
+    function pollStorage() {
+      try {
+        const currentRaw = localStorage.getItem('bible_sermon_pro_current_state_v1');
+        if (currentRaw && currentRaw !== lastCurrentRaw) {
+          const msg = JSON.parse(currentRaw);
+          lastCurrentRaw = currentRaw;
+          handleMessage(msg);
+          return;
+        }
+        const raw = localStorage.getItem('bible_sermon_pro_broadcast_v1');
+        if (raw && raw !== lastBroadcastRaw) {
+          const msg = JSON.parse(raw);
+          lastBroadcastRaw = raw;
+          handleMessage(msg);
+        }
+      } catch (e) { log('Storage polling unavailable', String(e)); }
+    }
+
+    function sendSyncRequest() {
+      const req = { type: 'BIBLE_SERMON_PRO_SYNC_REQUEST', timestamp: Date.now() };
+      try { if (channel) channel.postMessage(req); } catch (e) { log('Sync request failed', String(e)); }
+      try { localStorage.setItem('bible_sermon_pro_sync_request_v1', JSON.stringify(req)); } catch (e) {}
+    }
+
+    function init() {
+      applyDefaultObsStyles();
+      applyScreenConfig(currentScreenConfig);
+      if ('BroadcastChannel' in window) {
+        try {
+          channel = new BroadcastChannel(CHANNEL_NAME);
+          channel.onmessage = event => handleMessage(event.data);
+          log('BroadcastChannel connected');
+        } catch (e) { log('BroadcastChannel unavailable', String(e)); }
+      }
+      window.addEventListener('storage', event => {
+        if ((event.key === 'bible_sermon_pro_current_state_v1' || event.key === 'bible_sermon_pro_broadcast_v1') && event.newValue) {
+          try {
+            if (event.key === 'bible_sermon_pro_current_state_v1') lastCurrentRaw = event.newValue;
+            else lastBroadcastRaw = event.newValue;
+            handleMessage(JSON.parse(event.newValue));
+          } catch (e) { log('Storage event parse failed', String(e)); }
+        }
+      });
+      pollStorage();
+      window.setInterval(pollStorage, 250);
+      window.setTimeout(sendSyncRequest, 500);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+    else init();
+  })();
+  </script>
+</body>
+</html>

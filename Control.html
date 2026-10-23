@@ -1,0 +1,4156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bible Sermon Presenter</title>
+  
+  <!-- CodeMirror 5 Local / CDN -->
+  <link rel="stylesheet" href="codemirror.min.css">
+  <script src="codemirror.min.js"></script>
+
+  <!-- Coloris.js CSS & JS CDN -->
+  <link rel="stylesheet" href="coloris.min.css"/>
+  <script src="coloris.min.js"></script>
+
+  <script src="default-styles.js"></script>
+  <script src="display-renderer.js"></script>
+  <script src="icons.js"></script>
+
+  <script src="settings.js"></script>
+
+  <style>
+    :root {
+      --bg-main: rgba(30, 30, 36, 1);
+      --bg-card: rgba(43, 43, 54, 1);
+      --bg-hover: rgba(59, 59, 72, 1);
+      --accent: rgba(23, 85, 126, 1);
+      --accent-live: rgba(181, 27, 40, 1);
+      --text-main: rgba(241, 241, 241, 1);
+      --text-muted: rgba(160, 160, 176, 1);
+      --border: rgba(63, 63, 80, 1);
+      --syntax-header: rgba(78, 201, 176, 1);
+      --syntax-class: rgba(206, 145, 120, 1);
+      --syntax-block: rgba(220, 220, 170, 1);
+      --tabisactive: rgba(25, 25, 35, 1);
+      --syntax-block-reset: rgba(197, 134, 192, 1);
+      --scope-tint-block-bg: rgba(220, 220, 170, 0.12);
+      --scope-tint-block-border: rgba(220, 220, 170, 1);
+      --scope-tint-persistent-bg: rgba(197, 134, 192, 0.14);
+      --scope-tint-persistent-border: rgba(197, 134, 192, 1);
+      --scope-gap: 2px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #3e3e50 #2b2b36;
+    }
+
+    header {
+      background: #141418;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #3e3e50 #2b2b36;
+    }
+
+    *::-webkit-scrollbar {
+      width: 1px !important;
+      height: 1px !important;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: #2b2b36 !important;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background: #3e3e50 !important;
+      border-radius: 10px;
+    }
+
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      width: 1px !important;
+      height: 1px !important;
+    }
+
+    .nav-tabs { display: flex; list-style: none; }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 1rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--text-main); }
+    .tab-btn.active { color: var(--text-main); border-bottom-color: var(--accent); }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: bold;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      background: #282830;
+    }
+    .status-indicator { width: 10px; height: 10px; border-radius: 50%; background: #666; }
+    .status-indicator.active { background: #00e676; box-shadow: 0 0 8px #00e676; }
+
+    main { flex: 1; overflow: hidden; position: relative; }
+    .tab-content { display: none; height: 100%; padding: 1rem; overflow-y: auto; }
+    .tab-content.active { display: flex; flex-direction: column; gap: 0.8rem; overflow-x: hidden; }
+
+    .session-tabs-bar {
+      display: flex;
+      align-items: center;
+      background: #141418;
+      border-bottom: 1px solid var(--border);
+      padding: 0.4rem 0.4rem 0 0.4rem;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .session-tabs-inner {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .session-tab {
+      background: #202029;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      color: var(--text-muted);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      max-width: 250px;
+      white-space: nowrap;
+      user-select: none;
+      transition: background 0.15s, color 0.15s;
+      overflow: hidden;
+    }
+    .session-tab:hover { background: var(--bg-card); color: var(--text-main); }
+    .session-tab.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-top: 3px solid var(--accent);
+      font-weight: bold;
+    }
+    .session-tab .close-tab {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .session-tab .close-tab:hover { background: var(--accent-live); color: white; }
+    .add-session-btn {
+      background: none;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      transition: all 0.2s;
+    }
+    .add-session-btn:hover { background: var(--bg-hover); color: var(--text-main); border-color: var(--accent); }
+
+    .edit-layout { display: flex; gap: 1rem; height: 100%; flex: 1; position: relative; }
+    .editor-container { flex: 1; display: flex; flex-direction: column; gap: 0.8rem; height: 100%; position: relative; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      background: var(--bg-card);
+      padding: 0.4rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      align-items: center;
+    }
+    .icon-btn {
+      background: var(--bg-main);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+    .icon-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+    .tool-divider { width: 1px; height: 22px; background: var(--border); margin: 0 0.2rem; }
+    .toolbar-spacer { margin-left: auto; }
+
+    .editor-wrapper {
+      position: relative;
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .CodeMirror {
+      flex: 1;
+      height: 100% !important;
+      background: var(--bg-card) !important;
+      color: var(--text-main) !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      font-size: 14px !important;
+      line-height: 22px !important;
+      padding: 0.5rem;
+    }
+    .CodeMirror-gutters { background: var(--bg-card) !important; border-right: 1px solid var(--border) !important; }
+    .CodeMirror-cursor { border-left: 2px solid var(--text-main) !important; }
+    
+    .CodeMirror-selected { background: #3b3b58 !important; }
+    .CodeMirror-focused .CodeMirror-selected { background: #264f78 !important; }
+
+    .cm-syntax-header { color: var(--syntax-header); font-weight: bold; }
+    .cm-syntax-class { color: var(--syntax-class); font-weight: bold; }
+    .cm-syntax-block { color: var(--syntax-block); font-weight: bold; }
+    .cm-syntax-block-reset { color: var(--syntax-block-reset); font-weight: bold; }
+
+    /* Scope / Block Background Tinting & Gap Separation only where scope starts/breaks */
+    .CodeMirror-line.cm-scope-block-start,
+    .CodeMirror-linebackground.cm-scope-block-start {
+      margin-top: var(--scope-gap) !important;
+    }
+    .CodeMirror-line.cm-scope-block,
+    .CodeMirror-linebackground.cm-scope-block {
+      background: var(--scope-tint-block-bg) !important;
+      border-left: 2px solid var(--scope-tint-block-border) !important;
+      border-radius: 0px;
+    }
+
+    .CodeMirror-line.cm-scope-persistent-start,
+    .CodeMirror-linebackground.cm-scope-persistent-start {
+      margin-top: var(--scope-gap) !important;
+    }
+    .CodeMirror-line.cm-scope-persistent,
+    .CodeMirror-linebackground.cm-scope-persistent {
+      background: var(--scope-tint-persistent-bg) !important;
+      border-left: 2px solid var(--scope-tint-persistent-border) !important;
+      border-radius: 0px;
+    }
+
+    .edit-nav-bar {
+      display: flex;
+      gap: 0.5rem;
+      background: var(--bg-card);
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      align-items: center;
+    }
+    .edit-nav-btn {
+      background: var(--bg-main);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: bold;
+      transition: background 0.15s;
+    }
+    .edit-nav-btn svg { width: 16px; height: 16px; fill: currentColor; }
+    .edit-nav-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+    .edit-nav-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+    .side-toggle-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      transition: background 0.15s;
+    }
+    .side-toggle-btn svg { width: 18px; height: 18px; fill: currentColor; }
+    .side-toggle-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+    .css-sidebar {
+      width: 320px;
+      min-width: 220px;
+      max-width: 600px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      overflow-y: auto;
+      position: relative;
+    }
+    .css-sidebar.hidden { display: none; }
+
+    .preview-column {
+        position: fixed;
+        bottom: 70px;
+        right: 20px;
+        width: 420px;
+        max-width: 90vw;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 9999;
+        pointer-events: none;
+    }
+    .preview-column.hidden {
+      display: none;
+    }
+    .preview-column > * {
+      pointer-events: auto;
+    }
+
+    .resize-handle {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 6px;
+      height: 100%;
+      cursor: ew-resize;
+      background: transparent;
+      z-index: 25;
+      transition: background 0.15s;
+    }
+    .resize-handle:hover, .resize-handle.resizing { background: var(--accent); }
+    
+    .css-sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    .css-sidebar-header h3 { font-size: 0.9rem; color: var(--accent); text-transform: uppercase; }
+
+    details.default-accordion, details.saved-styles-accordion {
+      background: #202029;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem;
+    }
+    details.saved-styles-accordion-custom {
+      max-height: 350px;
+      overflow-y: auto;
+    }
+    details summary {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.8rem;
+      user-select: none;
+      outline: none;
+    }
+    details.default-accordion summary { color: #00e676; }
+    details.saved-styles-accordion summary { color: #38b6ff; }
+
+    .scrollable-list {
+      height: 350px;
+      overflow-y: auto;
+    }
+    
+    .default-class-list, .saved-class-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 0.6rem;
+    }
+
+    .saved-styles-info {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+      margin-bottom: 0.4rem;
+    }
+
+    .saved-styles-actions {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .btn-saved-action {
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: background 0.15s;
+    }
+    .btn-saved-action:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+    .css-menu-tabs {
+      display: flex;
+      gap: 0.4rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+      align-items: center;
+    }
+    .css-tab-btn {
+      flex: 1;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .css-tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+    .btn-clear-inactive {
+      background: var(--accent-live);
+      border: none;
+      color: white;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      display: none;
+    }
+    .btn-clear-inactive.show { display: block; }
+
+    .css-search-box {
+      width: 100%;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.45rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .class-item {
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+    }
+    .class-item.inactive { opacity: 0.85; }
+    .class-item-header { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
+    .class-item-title { font-weight: bold; font-size: 0.8rem; color: #00e676; font-family: monospace; }
+    .class-item-title.readonly { color: #ffb74d; }
+    .class-item-title.saved-title { color: #38b6ff; }
+    
+    .class-title-input {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: #38b6ff;
+      border-radius: 4px;
+      padding: 0.2rem 0.4rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      font-weight: bold;
+      outline: none;
+      width: 100%;
+    }
+
+    .class-item textarea {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      border-radius: 4px;
+      padding: 0.5rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      height: 60px;
+      outline: none;
+      resize: vertical;
+    }
+    .class-item textarea[readonly] { background: #1e1e24; color: #a0a0b0; cursor: not-allowed; }
+    
+    .btn-icon-action {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 2px 4px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-icon-action:hover { color: var(--text-main); background: var(--bg-hover); }
+    .btn-delete-class { color: var(--accent-live); font-weight: bold; font-size: 1.1rem; }
+
+    .countdown-notice { font-size: 0.72rem; color: #ffb74d; font-style: italic; }
+
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast-msg {
+      background: #2b2b36;
+      border: 1px solid var(--accent);
+      border-left: 4px solid var(--accent);
+      color: var(--text-main);
+      padding: 0.8rem 1.2rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      pointer-events: auto;
+      max-width: 380px;
+      line-height: 1.3;
+    }
+    .toast-msg.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .live-layout { display: flex; gap: 0.8rem; height: 100%; position: relative; user-select: none; }
+    .slides-column { flex: 1; display: flex; flex-direction: column; gap: 1rem; height: 100%; min-width: 300px; padding-right: 0.8rem; position: relative; }
+
+    .slide-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.2rem;
+      /* Keep every slide on its own row; content inside the thumbnail must not size the grid tracks. */
+      grid-auto-rows: max-content;
+      align-content: start;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin: 0.5rem;
+      padding-bottom: 5rem;
+    }
+
+    .slide-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      position: relative;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      min-height: 0;
+      align-self: start;
+      overflow: hidden;
+      width: 100%;
+      scrollbar-color: #23232f #121218eb;
+    }
+
+    .slide-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .slide-card.active { border-color: white; background: var(--tabisactive); }
+
+    .slide-card-number {
+      position: absolute;
+      top: 0.2rem;
+      left: 0.3rem;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: bold;
+      pointer-events: none;
+      z-index: 5;
+      text-shadow: 0 1px 3px #000;
+    }
+
+    .slide-card-viewport {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border-radius: 6px;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .slide-card-canvas {
+      position: absolute;
+      width: 1280px;
+      height: 720px;
+      left: 50%;
+      top: 50%;
+      transform-origin: center center;
+      overflow: hidden;
+      box-sizing: border-box;
+      background: transparent;
+    }
+
+    .slide-card-canvas .title {
+      font-size: 1.5rem;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+      width: 100%;
+    }
+
+    .slide-card-canvas .content {
+      font-size: 2.2rem;
+      line-height: 1.4;
+      font-weight: 500;
+      width: 100%;
+      white-space: pre-wrap;
+    }
+
+    .animation-sidebar-overlay {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 280px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 200;
+      transform: translateX(110%);
+      transition: transform 0.3s ease;
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+    }
+    .animation-sidebar-overlay.visible {
+      transform: translateX(0);
+    }
+    .animation-sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    .animation-sidebar-header h3 {
+      font-size: 0.9rem;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .anim-option-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      background: var(--bg-main);
+      padding: 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .anim-duration-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .anim-duration-input {
+      width: 80px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      text-align: right;
+      font-size: 0.8rem;
+    }
+
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3f3f50; transition: .3s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: #6800d2; }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .anim-sidebar-toggle-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      z-index: 190;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .anim-sidebar-toggle-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+    .preview-box {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+        padding-top: 0.4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        aspect-ratio: 16 / 9;
+        width: 100%;
+        max-width: 450px;
+        max-height: 450px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    }
+    .preview-box-header { display: flex; justify-content: space-between; align-items: center; }
+    .preview-box h3 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; }
+
+    .aspect-ratio-control {
+      font-size: 0.65rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      display: none;
+    }
+    .aspect-ratio-label { opacity: 0.8; }
+    .aspect-ratio-input {
+      width: 40px;
+      padding: 2px 4px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.1);
+      color: inherit;
+      text-align: center;
+      font-size: 0.65rem;
+    }
+    .aspect-save-btn {
+      background: none;
+      border: none;
+      color: white;
+      padding: 3px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .preview-screen {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      position: relative;
+      padding: 0;
+      border-radius: 6px;
+      display: block;
+      text-align: center;
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    /* Fixed virtual HD canvas, scaled down to fit the preview window. */
+    #preview-canvas {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 1280px;
+      height: 720px;
+      transform: translate(-50%, -50%) scale(var(--preview-scale, 1));
+      transform-origin: center center;
+      background: transparent;
+      box-sizing: border-box;
+    }
+
+
+#preview-display-container {
+    position: relative;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+
+    .preview-screen .title { display: none; color: #007acc; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; width: 100%; text-align: center; }
+    .preview-screen .content { color: #fff; font-size: 2.2rem; line-height: 1.4; font-weight: 500; width: 100%; white-space: pre-wrap; text-align: center; }
+
+    .title { display: none; color: #007acc; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; width: 100%; }
+    .content { color: #fff; font-size: 1.2rem; line-height: 1.4; font-weight: 500; width: 100%; white-space: pre-wrap; }
+    .content b, .title b { font-weight: bold; } .content i, .title i { font-style: italic; }
+    .content u, .title u { text-decoration: underline; text-underline-offset: 4px; }
+
+    .action-bar {
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      z-index: 100;
+      display: flex;
+      gap: 0.8rem;
+      background: #141418;
+      padding: 0.8rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      align-items: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      width: 270px;
+    }
+
+    .btn-action {
+      flex: 1;
+      padding: 0.7rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .btn-clear { background: var(--accent-live); -webkit-text-stroke: 1.15px var(--text-main); }
+    .btn-nav { background: var(--accent); color: var(--text-main); border: 1px solid var(--border); -webkit-text-stroke: 1.2px var(--text-main); }
+    .btn-next { background: var(--accent); -webkit-text-stroke: 1.2px var(--text-main); }
+
+    .btn-nav:hover, .btn-next:hover { background-color: #2572a5; }
+    .btn-clear:hover { background-color: #b3323d; }
+
+    .settings-wrapper {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .settings-top-actions {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: flex;
+      gap: 0.5rem;
+      z-index: 10;
+    }
+    .settings-group {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+    /* .settings-group-max { max-width: 600px; }*/
+    .settings-group-full {
+      max-width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .settings-group details {
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .settings-group summary {
+      cursor: pointer;
+      font-weight: bold;
+      color: var(--accent);
+      outline: none;
+      user-select: none;
+    }
+    .form-control { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-control-margin { margin-top: 1rem; }
+    .form-control label { font-size: 0.9rem; font-weight: bold; }
+    .form-control input {
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.6rem;
+      border-radius: 4px;
+      outline: none;
+      min-width: 220px;
+      width: max-content !important;
+      margin-right: 2rem;
+    }
+    .color-picker-row { display: flex; gap: 0.8rem; align-items: center; margin-bottom: 1.5rem; }
+
+    .log-header-row {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .log-actions-group {
+      margin-left: auto;
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .log-max-input {
+      width: 110px;
+      padding: 0.3rem;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      border-radius: 4px;
+    }
+    .log-container-box {
+      flex: 1;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      color: #a0a0b0;
+      max-height: calc(100vh - 180px);
+    }
+
+    .session-save-overlay { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: 1rem; background: rgba(0,0,0,.72); }
+    .session-save-dialog { width: min(440px, 100%); padding: 1.25rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel, var(--bg-main)); box-shadow: 0 18px 60px rgba(0,0,0,.45); }
+    .session-save-dialog h3 { margin: 0 0 .65rem; color: var(--accent); }
+    .session-save-dialog p { margin: 0 0 1rem; color: var(--text-muted, var(--text-main)); font-size: .9rem; }
+    .session-save-dialog input { box-sizing: border-box; width: 100%; padding: .7rem; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-main); color: var(--text-main); }
+    .session-save-dialog-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+    .session-save-content { box-sizing: border-box; width: 100%; min-height: 220px; max-height: 45vh; resize: vertical; padding: .7rem; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-main); color: var(--text-main); font: 12px/1.45 monospace; }
+
+    .hide { display: none; }
+
+    .sidebar-row-between { display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-label-main { font-size: 0.85rem; font-weight: bold; color: var(--text-main); }
+    .sidebar-textarea-style {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      border-radius: 4px;
+      padding: 0.4rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+      resize: vertical;
+    }
+    .sidebar-file-input { font-size: 0.75rem; }
+    .sidebar-control-gap { gap: 0.3rem; margin-top: 0.4rem; }
+
+    .screen-tabs-bar {
+      display: flex;
+      gap: 3px;
+      background: var(--bg-main);
+      padding: 4px 4px 0 4px;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      margin-top: 0.5rem;
+    }
+    .screen-tab-btn {
+      flex: 1;
+      background: #141418;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      color: var(--text-muted);
+      padding: 0.4rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .screen-tab-btn:hover { background: var(--bg-hover); color: var(--text-main); }
+    .screen-tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-top: 3px solid var(--accent);
+      font-weight: bold;
+    }
+    .screen-tab-content { display: none; }
+    .screen-tab-content.active { display: block; }
+  </style>
+
+  <style id="dynamic-user-styles"></style>
+</head>
+<body>
+
+  <header>
+    <ul class="nav-tabs">
+      <li><button class="tab-btn active" onclick="switchMainTab('live')">Live</button></li>
+      <li><button class="tab-btn" onclick="switchMainTab('edit')">Edit</button></li>
+      <li><button class="tab-btn" onclick="switchMainTab('settings')">Settings</button></li>
+      <li><button class="tab-btn" onclick="switchMainTab('log')">Log</button></li>
+    </ul>
+    <div class="status-badge">
+      <div id="status-dot" class="status-indicator"></div>
+      <span id="status-text">DISCONNECTED</span>
+    </div>
+  </header>
+
+  <div id="toast-container"></div>
+
+  <div id="session-save-dialog" class="session-save-overlay" role="dialog" aria-modal="true" aria-labelledby="session-save-title">
+    <form class="session-save-dialog" onsubmit="event.preventDefault(); saveSessionWithFilename();">
+      <h3 id="session-save-title">Save Session</h3>
+      <p>Choose a filename. The .bsp extension will be added automatically.</p>
+      <input id="session-save-filename" type="text" maxlength="180" autocomplete="off" required aria-label="Session filename">
+      <div class="session-save-dialog-actions">
+        <button type="button" class="edit-nav-btn" onclick="closeSessionSaveDialog()">Cancel</button>
+        <button type="submit" class="edit-nav-btn">Continue</button>
+      </div>
+    </form>
+  </div>
+  <div id="session-manual-save-dialog" class="session-save-overlay" role="dialog" aria-modal="true" aria-labelledby="session-manual-save-title">
+    <div class="session-save-dialog" style="width:min(760px,100%);">
+      <h3 id="session-manual-save-title">Save Session from OBS</h3>
+      <p>OBS's embedded browser can create an empty download instead of writing the file contents. To avoid a 0-byte file, copy the complete content below into a text editor and save it as the filename shown, using UTF-8 text and the <strong>.bsp</strong> extension.</p>
+      <p><strong>Filename:</strong> <span id="session-manual-save-name"></span></p>
+      <textarea id="session-manual-save-content" class="session-save-content" readonly spellcheck="false" aria-label="Session file content"></textarea>
+      <div class="session-save-dialog-actions">
+        <button type="button" class="edit-nav-btn" onclick="closeManualSessionSaveDialog()">Close</button>
+        <button type="button" class="edit-nav-btn" onclick="selectManualSessionContent()">Select All</button>
+        <button type="button" class="edit-nav-btn" onclick="copyManualSessionContent()">Copy Content</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="styles-save-dialog" class="session-save-overlay" role="dialog" aria-modal="true" aria-labelledby="styles-save-title">
+    <form class="session-save-dialog" onsubmit="event.preventDefault(); saveStylesWithFilename();">
+      <h3 id="styles-save-title">Save Custom Styles</h3>
+      <p>Choose a filename. The .js extension will be added automatically.</p>
+      <input id="styles-save-filename" type="text" maxlength="180" autocomplete="off" required aria-label="Styles filename">
+      <div class="session-save-dialog-actions">
+        <button type="button" class="edit-nav-btn" onclick="closeStylesSaveDialog()">Cancel</button>
+        <button type="submit" class="edit-nav-btn">Continue</button>
+      </div>
+    </form>
+  </div>
+  <div id="styles-manual-save-dialog" class="session-save-overlay" role="dialog" aria-modal="true" aria-labelledby="styles-manual-save-title">
+    <div class="session-save-dialog" style="width:min(760px,100%);">
+      <h3 id="styles-manual-save-title">Save Custom Styles from OBS</h3>
+      <p>OBS's embedded browser can create an empty download instead of writing the file contents. To avoid a 0-byte file, copy the complete content below into a text editor and save it as the filename shown, using UTF-8 text and the <strong>.js</strong> extension.</p>
+      <p><strong>Filename:</strong> <span id="styles-manual-save-name"></span></p>
+      <textarea id="styles-manual-save-content" class="session-save-content" readonly spellcheck="false" aria-label="Styles file content"></textarea>
+      <div class="session-save-dialog-actions">
+        <button type="button" class="edit-nav-btn" onclick="closeManualStylesSaveDialog()">Close</button>
+        <button type="button" class="edit-nav-btn" onclick="selectManualStylesContent()">Select All</button>
+        <button type="button" class="edit-nav-btn" onclick="copyManualStylesContent()">Copy Content</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-save-dialog" class="session-save-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-save-title">
+    <form class="session-save-dialog" onsubmit="event.preventDefault(); saveSettingsWithFilename();">
+      <h3 id="settings-save-title">Export Settings</h3>
+      <p>Choose a filename. The .json extension will be added automatically.</p>
+      <input id="settings-save-filename" type="text" maxlength="180" autocomplete="off" required aria-label="Settings filename">
+      <div class="session-save-dialog-actions">
+        <button type="button" class="edit-nav-btn" onclick="closeSettingsSaveDialog()">Cancel</button>
+        <button type="submit" class="edit-nav-btn">Continue</button>
+      </div>
+    </form>
+  </div>
+  <div id="settings-manual-save-dialog" class="session-save-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-manual-save-title">
+    <div class="session-save-dialog" style="width:min(760px,100%);">
+      <h3 id="settings-manual-save-title">Export Settings from OBS</h3>
+      <p>OBS's embedded browser can create an empty download instead of writing the file contents. To avoid a 0-byte file, copy the complete content below into a text editor and save it as the filename shown, using UTF-8 text and the <strong>.json</strong> extension.</p>
+      <p><strong>Filename:</strong> <span id="settings-manual-save-name"></span></p>
+      <textarea id="settings-manual-save-content" class="session-save-content" readonly spellcheck="false" aria-label="Settings file content"></textarea>
+      <div class="session-save-dialog-actions">
+        <button type="button" class="edit-nav-btn" onclick="closeManualSettingsSaveDialog()">Close</button>
+        <button type="button" class="edit-nav-btn" onclick="selectManualSettingsContent()">Select All</button>
+        <button type="button" class="edit-nav-btn" onclick="copyManualSettingsContent()">Copy Content</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="session-tabs-bar" id="session-tabs-bar">
+    <div id="session-tabs-container" class="session-tabs-inner"></div>
+    <button class="add-session-btn" title="New Session Tab" onclick="createNewSessionTab()">+</button>
+  </div>
+
+  <main>
+    <div id="tab-live" class="tab-content active">
+      <div class="live-layout" id="live-layout">
+        <div class="slides-column">
+          <button class="anim-sidebar-toggle-btn" onclick="toggleAnimationSidebar()">⚙️ Properties</button>
+
+          <div id="slide-grid" class="slide-grid"></div>
+
+          <div class="action-bar">
+            <button class="btn-action btn-nav" title="Previous Slide" onclick="prevSlide()">&lt;&lt;</button>
+            <button class="btn-action btn-clear" title="Clear Screen" onclick="clearLiveDisplay()">⭯</button>
+            <button class="btn-action btn-next" title="Next Slide" onclick="nextSlide()">&gt;&gt;</button>
+          </div>
+        </div>
+
+        <div id="animation-sidebar-overlay" class="animation-sidebar-overlay">
+          <div class="animation-sidebar-header">
+            <h3>Properties</h3>
+            <button class="btn-icon-action" onclick="toggleAnimationSidebar()">&times;</button>
+          </div>
+          
+          <div class="anim-option-group">
+            <div class="sidebar-row-between">
+              <span class="sidebar-label-main">Fullscreen</span>
+              <label class="switch">
+                <input type="checkbox" id="fullscreen-toggle" checked onchange="toggleFullscreenState()">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="screen-tabs-bar">
+              <button id="tab-btn-part" class="screen-tab-btn" onclick="switchScreenTab('part')">PartScreen</button>
+              <button id="tab-btn-full" class="screen-tab-btn active" onclick="switchScreenTab('full')">FullScreen</button>
+            </div>
+
+            <div id="content-part" class="screen-tab-content form-control" style="gap: 0.3rem; border: 1px solid var(--border); border-top: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; background: var(--bg-card); padding: 0.5rem;">
+              <textarea id="partscreen-css" class="sidebar-textarea-style" style="height: 150px; width:100%; font-size: 0.7rem;" oninput="updateScreenStyles()">position:absolute;
+bottom: 3%;
+left: 50%;
+transform: translateX(-50%);
+width: 85%;
+max-width: 1200px;
+background: rgba(18, 18, 24, 0.92);
+border-radius: 8px;
+padding: 30px 40px;
+box-shadow: 0 20px 40px rgba(0,0,0,.6);
+backdrop-filter: blur(8px);
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+min-height: 140px;
+opacity: 0;
+transition: opacity 600ms ease;</textarea>
+            </div>
+
+            <div id="content-full" class="screen-tab-content active form-control" style="gap: 0.3rem; border: 1px solid var(--border); border-top: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; background: var(--bg-card); padding: 0.5rem;">
+              <textarea id="fullscreen-css" class="sidebar-textarea-style" style="height: 150px; width:100%; font-size: .7rem;" oninput="updateScreenStyles()">position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+width: 85%;
+max-width: 1200px;
+border-radius: 8px;
+padding: 30px 40px;
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+min-height: 140px;
+opacity: 0;
+transition: opacity 600ms ease;</textarea>
+            </div>
+          </div>
+
+          <div class="anim-option-group">
+            <span class="sidebar-label-main">Fade Transition</span>
+            <div class="anim-duration-row">
+              <span>Duration (ms):</span>
+              <input type="number" id="dur-fade" class="anim-duration-input" value="0" min="0" step="5" oninput="updateAnimationSettings()">
+            </div>
+          </div>
+
+          <div class="anim-option-group">
+            <div class="sidebar-row-between">
+              <span class="sidebar-label-main">Add Background Image</span>
+              <label class="switch">
+                <input type="checkbox" id="bg-image-toggle" onchange="toggleBackgroundImageState()">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="form-control sidebar-control-gap">
+              <input type="file" id="bg-image-file" accept="image/*" class="sidebar-file-input" onchange="handleBackgroundImageUpload(event)">
+            </div>
+            <div class="form-control sidebar-control-gap">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">Custom CSS Properties:</label>
+              <textarea id="bg-image-css" class="sidebar-textarea-style" style="height: 70px;" oninput="updateBackgroundImageStyles()">background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+background-color: rgba(0, 0, 0, 0.9);
+background-blend-mode: multiply;</textarea>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="tab-edit" class="tab-content">
+      <div class="edit-layout">
+        <div class="editor-container">
+          <div class="toolbar" id="toolbar"></div>
+          
+          <div class="editor-wrapper">
+            <textarea id="editor" placeholder="Type sermon text here... Use '## Title' for slides, '#.class' for line styles, and '#..class' ... '#..' for blocks."></textarea>
+          </div>
+
+          <div class="edit-nav-bar" id="edit-nav-bar">
+            <button class="edit-nav-btn" title="Go to Previous Slide" onclick="prevSlide()"><span id="icon-prev"></span> Prev Slide</button>
+            <button class="edit-nav-btn" title="Go to Slide at Cursor Position" onclick="jumpToCursorSlide()"><span id="icon-locate"></span>Jump to Cursor</button>
+            <button class="edit-nav-btn" title="Go to Next Slide" onclick="nextSlide()"><span id="icon-next"></span> Next Slide</button>
+            
+            <button class="edit-nav-btn" id="auto-sync-toggle-btn" title="Toggle Auto-Sync Slide with Cursor" onclick="toggleAutoSyncCursor()"><span id="icon-autosync"></span> Auto-Sync: OFF</button>
+          </div>
+        </div>
+
+        <div id="css-sidebar" class="css-sidebar hidden">
+          <div class="resize-handle" id="css-sidebar-resizer"></div>
+          <div class="css-sidebar-header">
+            <h3>CSS Class Menu</h3>
+          </div>
+
+          <details class="default-accordion">
+            <summary>Default System Classes (Read-Only)</summary>
+            <div id="default-class-list" class="default-class-list scrollable-list"></div>
+          </details>
+
+          <details class="saved-styles-accordion saved-styles-accordion-custom" open>
+            <summary>Saved Styles</summary>
+            <div>
+              <p class="saved-styles-info">Save custom styles here to keep for future sessions and use every time you open the program.</p>
+              <div class="saved-styles-actions">
+                <button class="btn-saved-action" onclick="saveCustomStylesToSystem()"><span>💾</span> Save Styles</button>
+                <button class="btn-saved-action" onclick="addNewSavedStyleSlot()"><span>+</span> Add Style</button>
+                <button class="btn-saved-action" onclick="document.getElementById('import-custom-styles-file').click()"><span>📂</span> Import</button>
+                <input type="file" id="import-custom-styles-file" accept=".js,.json,.txt" class="hide" onchange="importCustomStylesFromFile(event)">
+              </div>
+              <div id="saved-class-list" class="saved-class-list"></div>
+            </div>
+          </details>
+
+          <input type="text" id="css-search" class="css-search-box" placeholder="Search active/inactive classes..." oninput="renderCssSidebar()">
+
+          <div class="css-menu-tabs">
+            <button id="tab-btn-active" class="css-tab-btn active" onclick="switchCssTab('active')">Active <span id="count-active">(0)</span></button>
+            <button id="tab-btn-inactive" class="css-tab-btn" onclick="switchCssTab('inactive')">Inactive <span id="count-inactive">(0)</span></button>
+        </div>
+
+        <button id="btn-clear-inactive" class="btn-clear-inactive" title="Flush all inactive empty classes" onclick="clearAllInactiveClasses()">Clear All</button>  
+        <div id="css-class-list" class="css-class-list" style="flex-direction: column; gap: 0.8rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-settings" class="tab-content">
+      <div class="settings-wrapper">
+        <div class="settings-top-actions" id="settings-top-actions">
+          <button class="icon-btn" title="Reset to Defaults" onclick="resetSettingsToDefault()">⭯</button>
+          <button class="icon-btn" title="Export Settings" onclick="exportSettingsToFile()"><svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+          <button class="icon-btn" title="Import Settings" onclick="document.getElementById('import-settings-file').click()"><svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg></button>
+          <input type="file" id="import-settings-file" accept=".json" class="hide" onchange="importSettingsFromFile(event)">
+        </div>
+
+        <div class="settings-group settings-group-max">
+          <details open>
+            <summary>Display Theme & Background</summary>
+            <div class="form-control form-control-margin">
+              <label>Background Mode (Color Picker / Custom CSS)</label>
+              <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Color Picker</span>
+                <label class="switch">
+                  <input type="checkbox" id="bg-mode-toggle" onchange="toggleBgModeSwitch(this)">
+                  <span class="slider"></span>
+                </label>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Custom CSS</span>
+              </div>
+
+              <div id="bg-picker-container" class="color-picker-row">
+                <input type="text" id="bg-color-picker-element" data-coloris class="sidebar-textarea-style" style="width: 120px;" value="rgba(18, 18, 24, 1)">
+              </div>
+
+              <div id="bg-css-container" class="hide">
+                <textarea id="custom-bg-css" class="sidebar-textarea-style" style="height: 80px; width: 100%;" placeholder="opacity: 1 !important;&#10;background-image: linear-gradient(45deg, rgb(4, 32, 144) 0%, rgb(56, 0, 0) 100%);" oninput="applyCustomBgCss(this.value)">opacity: 1 !important;
+background-image: linear-gradient(45deg, rgb(4, 32, 144) 0%, rgb(56, 0, 0) 100%);</textarea>
+              </div>
+              <small>Adjusts background color or custom CSS style of the OBS overlay display in real time.</small>
+            </div>
+          </details>
+
+          <details open>
+            <summary>Syntax Highlighting Custom Colors</summary>
+            <div class="form-control form-control-margin">
+              <label>Slide Header Color (##)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-header" data-coloris class="sidebar-textarea-style" style="width: 120px;" value="rgba(78, 201, 176, 1)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Inline Class Color (#.)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-class" data-coloris class="sidebar-textarea-style" style="width: 120px;" value="rgba(206, 145, 120, 1)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Block Class Color (#..)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-block" data-coloris class="sidebar-textarea-style" style="width: 120px;" value="rgba(220, 220, 170, 1)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Block Reset Color (#..#)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-block-reset" data-coloris class="sidebar-textarea-style" style="width: 120px;" value="rgba(197, 134, 192, 1)">
+              </div>
+            </div>
+          </details>
+
+          <details open>
+            <summary>Editor Scope Tint Colors (with Alpha)</summary>
+            <div class="form-control form-control-margin">
+              <label>Block Scope Tint (#..)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-scope-block" data-coloris class="sidebar-textarea-style" style="width: 160px;" value="rgba(220, 220, 170, 0.12)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Block Scope Border Color (#..)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-scope-block-border" data-coloris class="sidebar-textarea-style" style="width: 160px;" value="rgba(220, 220, 170, 1)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Persistent Scope Tint (#..#)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-scope-persistent" data-coloris class="sidebar-textarea-style" style="width: 160px;" value="rgba(197, 134, 192, 0.14)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Persistent Scope Border Color (#..#)</label>
+              <div class="color-picker-row">
+                <input type="text" id="picker-scope-persistent-border" data-coloris class="sidebar-textarea-style" style="width: 160px;" value="rgba(197, 134, 192, 1)">
+              </div>
+            </div>
+            <div class="form-control">
+              <label>Scope Block Gap (px)</label>
+              <div class="color-picker-row">
+                <input type="range" id="scope-gap-range" min="0" max="8" step="1" value="2" oninput="updateScopeGap(this.value)" style="flex:1; cursor:pointer;" title="Gap Size">
+                <input type="number" id="scope-gap-input" min="0" max="8" value="2" oninput="updateScopeGap(this.value)" style="width:70px;">
+              </div>
+            </div>
+          </details>
+
+          <details open>
+            <summary>Performance & Broadcast</summary>
+            <div class="form-control form-control-margin">
+              <label for="target-fps">Target Framerate (FPS)</label>
+              <input type="number" id="target-fps" value="30" min="1" max="60" onchange="saveFpsSetting(this.value)">
+              <small>Controls broadcast refresh rate limits.</small>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-log" class="tab-content">
+      <div class="settings-group settings-group-full">
+        <div class="log-header-row">
+          <h3 style="color: var(--accent);">System & Action Logs</h3>
+          <div class="log-actions-group">
+            <label style="font-size: 0.8rem;">Max Lines:</label>
+            <input type="number" id="log-max-lines" value="5000" min="10" max="100000" class="log-max-input" onchange="updateLogMaxLines(this.value)">
+            <button class="edit-nav-btn" onclick="clearSystemLog()">Clear</button>
+            <button class="edit-nav-btn" onclick="copySystemLog()">Copy</button>
+            <button class="edit-nav-btn" onclick="exportSystemLog()">Export .log</button>
+          </div>
+        </div>
+        <div class="log-header-row" style="margin-bottom:0.75rem;">
+          <input id="log-search" type="search" aria-label="Search logs" placeholder="Search log messages…" style="flex:1;min-width:180px;padding:.55rem;background:var(--bg-main);border:1px solid var(--border);color:var(--text-main);border-radius:4px;" oninput="renderLogContainer()">
+          <select id="log-level-filter" aria-label="Filter log level" onchange="renderLogContainer()" style="padding:.55rem;background:var(--bg-main);border:1px solid var(--border);color:var(--text-main);border-radius:4px;">
+            <option value="ALL">All levels</option><option value="INFO">Info</option><option value="WARN">Warnings</option><option value="ERROR">Errors</option><option value="DEBUG">Debug</option>
+          </select>
+        </div>
+        <div id="log-container" class="log-container-box" role="log" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- Global Floating Preview Box & Toggle Button -->
+    <div id="preview-col" class="preview-column hidden">
+      <div class="resize-handle" id="preview-col-resizer"></div>
+      <div class="preview-box" id="preview-box">
+        <div class="preview-box-header">
+          <h3>Live Preview</h3>
+          <div class="aspect-ratio-control">
+            <label class="aspect-ratio-label">Aspect Ratio:</label>
+            <input type="number" id="aspect-num" value="16" min="1" class="aspect-ratio-input" title="Numerator">
+            <span>:</span>
+            <input type="number" id="aspect-den" value="9" min="1" class="aspect-ratio-input" title="Denominator">
+            <button id="aspect-save-btn" class="aspect-save-btn" title="Apply Aspect Ratio">✓</button>
+          </div>
+        </div>
+        
+        <div id="preview-screen" class="preview-screen">
+          <div id="preview-canvas">
+            <div id="preview-display-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <div id="live-preview-title" class="title"></div>
+              <div id="live-preview-body" class="content"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="side-toggle-btn" id="preview-toggle-btn" title="Toggle Live Preview Box" onclick="togglePreviewBox()"></button>
+</main>
+
+  <script>
+    const CHANNEL_NAME = 'bible_sermon_pro_sync_v1';
+    let channel;
+    let sequenceNumber = 0;
+    const sessionId = 'session_' + Date.now().toString(36);
+
+    let sessions = [];
+    let currentSessionId = null;
+    let displayBgColor = '#121218';
+    let currentBgMode = 'picker';
+    let customBgCssValue = 'opacity: 1 !important;\nbackground-image: linear-gradient(45deg, rgb(4, 32, 144) 0%, rgb(56, 0, 0) 100%);';
+    let currentCssTab = 'active';
+    let targetFps = 30;
+    let autoSyncCursorActive = false;
+    let codeMirrorEditor = null;
+
+    let savedCustomStylesStore = [];
+
+    let systemLogs = [];
+    let maxLogLines = 5000;
+
+    let currentAnimationConfig = { type: 'fade', duration: 0 };
+    let previewFadeTimer = null;
+    let currentBgImageConfig = { enabled: false, dataUrl: '', css: 'background-size: cover;\nbackground-position: center;\nbackground-repeat: no-repeat;\nbackground-color: rgba(0, 0, 0, 0.9)\n;background-blend-mode: multiply;' };
+    let currentScreenConfig = {
+      enabled: true,
+      partCss: document.getElementById('partscreen-css') ? document.getElementById('partscreen-css').value : `position: absolute;\ntop: 50%;\nleft: 50%;\ntransform: translate(-50%, -50%);\nwidth: 85%;\nmax-width: 1200px;\nbackground: rgba(0, 0, 0, .75);\nborder-radius: 8px;\npadding: 30px 40px;\ndisplay: flex;\nflex-direction: column;\njustify-content: center;\nalign-items: center;\nmin-height: 140px;\nopacity: 0;\ntransition: opacity 600ms ease;`,
+      fullCss: document.getElementById('fullscreen-css') ? document.getElementById('fullscreen-css').value : `bottom: 3%;\nleft: 50%;\ntransform: translateX(-50%);\nwidth: 85%;\nmax-width: 1200px;\nbackground: rgba(18, 18, 24, 0.92);\nborder-radius: 8px;\npadding: 30px 40px;\nbox-shadow: 0 20px 40px rgba(0,0,0,.6);\nbackdrop-filter: blur(8px);\ndisplay: flex;\nflex-direction: column;\njustify-content: center;\nalign-items: center;\nmin-height: 140px;\nopacity: 0;\ntransition: opacity 600ms ease;`
+    };
+
+    CodeMirror.defineMode("bsp", function() {
+      return {
+        token: function(stream) {
+          if (stream.sol()) {
+            if (stream.match(/^##\s+.*/)) return "syntax-header";
+            if (stream.match(/^#\.\.#(\([^)]+\)|[a-zA-Z0-9_-]+)?(\s+.*)?/)) return "syntax-block-reset";
+            if (stream.match(/^#\.\.(\([^)]+\)|[a-zA-Z0-9_-]+).*/)) return "syntax-block";
+            if (stream.match(/^#\.(\([^)]+\)|[a-zA-Z0-9_-]+).*/)) return "syntax-class";
+          }
+          stream.next();
+          return null;
+        }
+      };
+    });
+
+    let lastStyledLines = [];
+
+    function updateEditorScopeHighlights() {
+      if (!codeMirrorEditor) return;
+      
+      lastStyledLines.forEach(item => {
+        try {
+          codeMirrorEditor.removeLineClass(item.handle, 'wrap', 'cm-scope-block');
+          codeMirrorEditor.removeLineClass(item.handle, 'wrap', 'cm-scope-persistent');
+          codeMirrorEditor.removeLineClass(item.handle, 'wrap', 'cm-scope-block-start');
+          codeMirrorEditor.removeLineClass(item.handle, 'wrap', 'cm-scope-persistent-start');
+          codeMirrorEditor.removeLineClass(item.handle, 'background', 'cm-scope-block');
+          codeMirrorEditor.removeLineClass(item.handle, 'background', 'cm-scope-persistent');
+          codeMirrorEditor.removeLineClass(item.handle, 'background', 'cm-scope-block-start');
+          codeMirrorEditor.removeLineClass(item.handle, 'background', 'cm-scope-persistent-start');
+        } catch(e) {}
+      });
+      lastStyledLines = [];
+
+      let activeScope = null;
+
+      codeMirrorEditor.eachLine((lineObj) => {
+        const text = lineObj.text.trim();
+
+        if (text === '#..#' || text === '#..') {
+          activeScope = null;
+          return;
+        }
+
+        if (text.startsWith('#..#')) {
+          activeScope = 'cm-scope-persistent';
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', activeScope);
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', 'cm-scope-persistent-start');
+          codeMirrorEditor.addLineClass(lineObj, 'background', activeScope);
+          codeMirrorEditor.addLineClass(lineObj, 'background', 'cm-scope-persistent-start');
+          lastStyledLines.push({ handle: lineObj, cls: activeScope });
+          return;
+        }
+
+        if (text.startsWith('#..')) {
+          activeScope = 'cm-scope-block';
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', activeScope);
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', 'cm-scope-block-start');
+          codeMirrorEditor.addLineClass(lineObj, 'background', activeScope);
+          codeMirrorEditor.addLineClass(lineObj, 'background', 'cm-scope-block-start');
+          lastStyledLines.push({ handle: lineObj, cls: activeScope });
+          return;
+        }
+
+        if (text.startsWith('##')) {
+          if (activeScope !== 'cm-scope-persistent') {
+            activeScope = null;
+            return;
+          }
+        }
+
+        if (text.startsWith('#.')) {
+          activeScope = null;
+          const singleScope = 'cm-scope-block';
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', singleScope);
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', 'cm-scope-block-start');
+          codeMirrorEditor.addLineClass(lineObj, 'background', singleScope);
+          codeMirrorEditor.addLineClass(lineObj, 'background', 'cm-scope-block-start');
+          lastStyledLines.push({ handle: lineObj, cls: singleScope });
+          return;
+        }
+
+        if (text === '') {
+          if (activeScope) {
+            codeMirrorEditor.addLineClass(lineObj, 'wrap', activeScope);
+            codeMirrorEditor.addLineClass(lineObj, 'background', activeScope);
+            lastStyledLines.push({ handle: lineObj, cls: activeScope });
+          }
+          return;
+        }
+
+        if (activeScope) {
+          codeMirrorEditor.addLineClass(lineObj, 'wrap', activeScope);
+          codeMirrorEditor.addLineClass(lineObj, 'background', activeScope);
+          lastStyledLines.push({ handle: lineObj, cls: activeScope });
+        }
+      });
+    }
+
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast-msg';
+      toast.textContent = message;
+      container.appendChild(toast);
+      
+      setTimeout(() => toast.classList.add('show'), 50);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 350);
+      }, 3500);
+    }
+
+    function safeLogDetail(details) {
+      if (details === undefined || details === null) return '';
+      if (details instanceof Error) return `${details.name}: ${details.message}${details.stack ? `\n${details.stack}` : ''}`;
+      if (typeof details === 'string') return details;
+      try { return JSON.stringify(details); } catch (_) { return String(details); }
+    }
+
+    function bspLog(action, details, level = 'INFO') {
+      const timestamp = new Date().toISOString();
+      const detailStr = safeLogDetail(details);
+      const logLine = `[${timestamp}] [${String(level).toUpperCase()}] [BSP-Control] ${action}${detailStr ? ` | ${detailStr}` : ''}`;
+      try { console.log(`[BSP-Control][${level}] ${action}`, details === undefined ? '' : details); } catch (_) {}
+      systemLogs.push(logLine);
+      if (systemLogs.length > maxLogLines) systemLogs.splice(0, systemLogs.length - maxLogLines);
+      renderLogContainer();
+    }
+
+    function renderLogContainer() {
+      const container = document.getElementById('log-container');
+      if (!container) return;
+      const search = (document.getElementById('log-search')?.value || '').trim().toLowerCase();
+      const level = document.getElementById('log-level-filter')?.value || 'ALL';
+      const filtered = systemLogs.filter(line => {
+        const lineLevel = (line.match(/\] \[(INFO|WARN|ERROR|DEBUG)\]/) || [,'INFO'])[1];
+        return (level === 'ALL' || lineLevel === level) && (!search || line.toLowerCase().includes(search));
+      });
+      container.textContent = filtered.join('\n') || (systemLogs.length ? 'No log entries match the current filters.' : 'No log entries yet.');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function clearSystemLog() {
+      systemLogs = [];
+      renderLogContainer();
+      bspLog('System log cleared by user.');
+    }
+
+    async function copySystemLog() {
+      const text = systemLogs.join('\n');
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(text);
+        else {
+          const temp = document.createElement('textarea'); temp.value = text; document.body.appendChild(temp); temp.select();
+          const ok = document.execCommand('copy'); temp.remove(); if (!ok) throw new Error('Clipboard copy was blocked');
+        }
+        showToast('Logs copied to clipboard.');
+        bspLog('Full system log copied to clipboard.');
+      } catch (err) { bspLog('Could not copy logs.', err, 'ERROR'); alert('Could not copy logs. Use Export .log instead.'); }
+    }
+
+    function exportSystemLog() {
+      try {
+        const content = systemLogs.join('\n') + '\n';
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        if (!blob.size) throw new Error('Log export is empty');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `bsp-control-log-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        bspLog(`Log export requested (${systemLogs.length} entries, ${blob.size} bytes).`);
+      } catch (err) { bspLog('Log export failed.', err, 'ERROR'); alert('Could not export the log.'); }
+    }
+
+    function updateLogMaxLines(val) {
+      const parsed = parseInt(val, 10);
+      if (parsed > 100000) {
+        alert("Error: Maximum line limit can only be 100,000.");
+        document.getElementById('log-max-lines').value = maxLogLines;
+        return;
+      }
+      if (parsed >= 10 && parsed <= 100000) {
+        maxLogLines = parsed;
+        while (systemLogs.length > maxLogLines) systemLogs.shift();
+        renderLogContainer();
+        bspLog(`Maximum log lines updated to ${maxLogLines}`);
+      }
+    }
+
+    window.addEventListener('error', (event) => {
+      bspLog('Uncaught JavaScript error.', { message: event.message, source: event.filename, line: event.lineno, column: event.colno }, 'ERROR');
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      bspLog('Unhandled promise rejection.', safeLogDetail(event.reason), 'ERROR');
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      bspLog('Initializing Control Panel...', { userAgent: navigator.userAgent, url: location.href });
+
+      codeMirrorEditor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+        mode: 'bsp',
+        lineWrapping: true,
+        viewportMargin: Infinity
+      });
+
+      codeMirrorEditor.on('change', () => {
+        handleEditorInput();
+        updateEditorScopeHighlights();
+      });
+      codeMirrorEditor.on('cursorActivity', () => handleCursorActivity());
+
+      initColorisPickers();
+      initChannel();
+      renderIcons();
+      renderDefaultClasses();
+      loadStoredSavedCustomStyles();
+      loadStoredSettings();
+      applyExternalSettingsFile();
+      initDefaultSession();
+      setupKeyboardShortcuts();
+      startHeartbeatParser();
+      initResizers();
+      startInactiveGarbageCollector();
+      updateEditorScopeHighlights();
+
+      const numInput = document.getElementById('aspect-num');
+      const denInput = document.getElementById('aspect-den');
+      const saveBtn = document.getElementById('aspect-save-btn');
+      const previewBoxTarget = document.getElementById('preview-box');
+
+      if (numInput && denInput && saveBtn && previewBoxTarget) {
+        saveBtn.addEventListener('click', () => {
+          const num = parseFloat(numInput.value) || 16;
+          const den = parseFloat(denInput.value) || 9;
+          
+          previewBoxTarget.style.aspectRatio = `${num} / ${den}`;
+          
+          if (num < den) {
+            const baseHeight = 400;
+            const calculatedWidth = baseHeight * (num / den);
+            previewBoxTarget.style.width = `${calculatedWidth}px`;
+            previewBoxTarget.style.height = `${baseHeight}px`;
+            previewBoxTarget.style.maxWidth = 'none';
+            previewBoxTarget.style.maxHeight = 'none';
+          } else {
+            const baseWidth = 420;
+            const calculatedHeight = baseWidth * (den / num);
+            previewBoxTarget.style.width = '100%';
+            previewBoxTarget.style.height = `${calculatedHeight}px`;
+            previewBoxTarget.style.maxWidth = '450px';
+            previewBoxTarget.style.maxHeight = '450px';
+          }
+
+          showToast(`Aspect ratio set to ${num}:${den}`);
+        });
+      }
+    });
+
+    // Normalize colors used by Settings to rgba() without forcing Coloris into
+    // a fixed output format. Keeping Coloris at format:'auto' preserves its
+    // native picker interactions; this layer standardizes the values we store
+    // and apply to CSS/preview/editor state.
+    function normalizeSettingsColorToRgba(value) {
+      if (typeof value !== 'string') return value;
+      const color = value.trim();
+      if (!color) return color;
+
+      let r, g, b, a = 1;
+      let match;
+
+      if ((match = color.match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i))) {
+        let hex = match[1];
+        if (hex.length === 3 || hex.length === 4) {
+          hex = hex.split('').map(ch => ch + ch).join('');
+        }
+        if (hex.length === 8) {
+          a = parseInt(hex.slice(6, 8), 16) / 255;
+          hex = hex.slice(0, 6);
+        }
+        r = parseInt(hex.slice(0, 2), 16);
+        g = parseInt(hex.slice(2, 4), 16);
+        b = parseInt(hex.slice(4, 6), 16);
+      } else if ((match = color.match(/^rgba?\(\s*([+-]?(?:\d*\.)?\d+)\s*,\s*([+-]?(?:\d*\.)?\d+)\s*,\s*([+-]?(?:\d*\.)?\d+)(?:\s*[,/]\s*([+-]?(?:\d*\.)?\d+)%?)?\s*\)$/i))) {
+        r = Math.max(0, Math.min(255, Math.round(Number(match[1]))));
+        g = Math.max(0, Math.min(255, Math.round(Number(match[2]))));
+        b = Math.max(0, Math.min(255, Math.round(Number(match[3]))));
+        if (match[4] !== undefined) {
+          a = Number(match[4]);
+          if (color.match(/[,/]\s*[+-]?(?:\d*\.)?\d+%\s*\)$/)) a /= 100;
+          a = Math.max(0, Math.min(1, a));
+        }
+      } else if (/^transparent$/i.test(color)) {
+        return 'rgba(0, 0, 0, 0)';
+      } else {
+        // Preserve unsupported CSS color syntax rather than corrupting it.
+        return color;
+      }
+
+      const alpha = Number(a.toFixed(3)).toString();
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function initColorisPickers() {
+      Coloris({
+        el: '[data-coloris]',
+        theme: 'dark',
+        alpha: true,
+        format: 'auto',
+        swatches: ['#121218', '#1e1e24', '#000000', '#ffffff', '#17557e', '#b51b28', '#4EC9B0', '#CE9178', '#DCDCAA', '#C586C0']
+      });
+
+      document.getElementById('bg-color-picker-element').addEventListener('input', (e) => {
+        applyBgColor(normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-header').addEventListener('input', (e) => {
+        updateSyntaxColor('header', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-class').addEventListener('input', (e) => {
+        updateSyntaxColor('class', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-block').addEventListener('input', (e) => {
+        updateSyntaxColor('block', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-block-reset').addEventListener('input', (e) => {
+        updateSyntaxColor('block-reset', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-scope-block').addEventListener('input', (e) => {
+        updateScopeTint('block', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-scope-block-border').addEventListener('input', (e) => {
+        updateScopeBorder('block', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-scope-persistent').addEventListener('input', (e) => {
+        updateScopeTint('persistent', normalizeSettingsColorToRgba(e.target.value));
+      });
+      document.getElementById('picker-scope-persistent-border').addEventListener('input', (e) => {
+        updateScopeBorder('persistent', normalizeSettingsColorToRgba(e.target.value));
+      });
+    }
+
+    function toggleBgModeSwitch(checkbox) {
+      const mode = checkbox.checked ? 'css' : 'picker';
+      switchBgMode(mode);
+    }
+
+    function switchBgMode(mode) {
+      currentBgMode = mode;
+      const toggle = document.getElementById('bg-mode-toggle');
+      if (toggle) toggle.checked = (mode === 'css');
+
+      document.getElementById('bg-picker-container').classList.toggle('hide', mode !== 'picker');
+      document.getElementById('bg-css-container').classList.toggle('hide', mode !== 'css');
+
+      if (mode === 'css') {
+        applyCustomBgCss(document.getElementById('custom-bg-css').value);
+      } else {
+        applyBgColor(displayBgColor);
+      }
+      bspLog(`Background mode switched to: ${mode}`);
+    }
+
+    function applyCustomBgCss(cssText) {
+      if (currentBgMode !== 'css') return;
+      customBgCssValue = cssText;
+      applyPreviewCustomCss(cssText);
+      broadcastPayload({ type: 'BG_CUSTOM_CSS_UPDATE', bgCss: cssText });
+      localStorage.setItem('bsp_bg_mode', 'css');
+      localStorage.setItem('bsp_custom_bg_css', cssText);
+    }
+
+    function applyPreviewCustomCss(cssText) {
+      const previewScreen = document.getElementById('preview-screen');
+      if (!previewScreen) return;
+      previewScreen.style.cssText = cssText || '';
+      previewScreen.style.position = 'relative';
+      previewScreen.style.padding = '0';
+      previewScreen.style.overflow = 'hidden';
+      previewScreen.style.display = 'block';
+      updatePreviewCanvasScale();
+    }
+
+    function toggleAnimationSidebar() {
+      const sidebar = document.getElementById('animation-sidebar-overlay');
+      if (sidebar) sidebar.classList.toggle('visible');
+    }
+
+    function switchScreenTab(tab) {
+      document.getElementById('tab-btn-part').classList.toggle('active', tab === 'part');
+      document.getElementById('tab-btn-full').classList.toggle('active', tab === 'full');
+      document.getElementById('content-part').classList.toggle('active', tab === 'part');
+      document.getElementById('content-full').classList.toggle('active', tab === 'full');
+    }
+
+function toggleFullscreenState() {
+  const toggle = document.getElementById('fullscreen-toggle');
+  currentScreenConfig.enabled = toggle ? toggle.checked : true;
+  applyPreviewScreenConfig(currentScreenConfig); // <-- Add this line
+  renderSlideGrid();
+  
+  // Update live preview immediately if a slide is active
+  const session = getCurrentSession();
+  if (session && session.activeSlideIndex >= 0) {
+    selectSlide(session.activeSlideIndex, true);
+  }
+
+  broadcastPayload({ type: 'SCREEN_CONFIG_UPDATE', screenConfig: currentScreenConfig });
+  bspLog(`Fullscreen state toggled: ${currentScreenConfig.enabled ? 'ON (FullScreen)' : 'OFF (PartScreen)'}`);
+}
+
+function updateScreenStyles() {
+  const partField = document.getElementById('partscreen-css');
+  const fullField = document.getElementById('fullscreen-css');
+  if (partField) currentScreenConfig.partCss = partField.value;
+  if (fullField) currentScreenConfig.fullCss = fullField.value;
+
+  applyPreviewScreenConfig(currentScreenConfig);
+  renderSlideGrid();
+  
+  // Update live preview immediately if a slide is active
+  const session = getCurrentSession();
+  if (session && session.activeSlideIndex >= 0) {
+    selectSlide(session.activeSlideIndex, true);
+  }
+
+  broadcastPayload({ type: 'SCREEN_CONFIG_UPDATE', screenConfig: currentScreenConfig });
+}
+
+    function updatePreviewCanvasScale() {
+      const previewScreen = document.getElementById('preview-screen');
+      const previewCanvas = document.getElementById('preview-canvas');
+      if (!previewScreen || !previewCanvas) return;
+      const w = previewScreen.clientWidth;
+      const h = previewScreen.clientHeight;
+      if (!w || !h) return;
+      previewCanvas.style.setProperty('--preview-scale', String(Math.min(w / 1280, h / 720)));
+    }
+
+    function applyPreviewScreenConfig(config) {
+      currentScreenConfig = config || currentScreenConfig;
+      const previewContainer = document.getElementById('preview-display-container');
+      if (!previewContainer || !currentScreenConfig) return;
+
+      // Resolve the same mode Display.html uses: enabled=true => fullCss,
+      // enabled=false => partCss. Apply the entire declaration block every time
+      // mode or either CSS editor changes; never retain stale declarations.
+      window.BibleSermonDisplayRenderer.setScreenConfig(
+        previewContainer,
+        currentScreenConfig,
+        { static: true }
+      );
+      const previewDuration = Math.max(0, parseInt(currentAnimationConfig?.duration ?? 0, 10) || 0);
+      previewContainer.style.transition = previewDuration > 0 ? `opacity ${previewDuration}ms ease` : 'none';
+      applyPreviewBackgroundImage();
+      updatePreviewCanvasScale();
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const previewResizeObserver = new ResizeObserver(updatePreviewCanvasScale);
+      const previewScreenForObserver = document.getElementById('preview-screen');
+      if (previewScreenForObserver) previewResizeObserver.observe(previewScreenForObserver);
+    }
+    window.addEventListener('resize', updatePreviewCanvasScale);
+    const slideGridForObserver = document.getElementById('slide-grid');
+    if (typeof ResizeObserver !== 'undefined' && slideGridForObserver) {
+      const slideGridResizeObserver = new ResizeObserver(scaleSlideCardCanvases);
+      slideGridResizeObserver.observe(slideGridForObserver);
+    }
+    window.addEventListener('resize', scaleSlideCardCanvases);
+
+    function updateAnimationSettings() {
+      const durInput = document.getElementById('dur-fade');
+      const parsed = durInput ? parseInt(durInput.value, 10) : NaN;
+      const duration = !isNaN(parsed) ? parsed : 0;
+      
+      currentAnimationConfig = { type: 'fade', duration: duration };
+      broadcastPayload({ type: 'ANIMATION_UPDATE', animation: currentAnimationConfig });
+    }
+
+    function handleBackgroundImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentBgImageConfig.dataUrl = e.target.result;
+        const cssField = document.getElementById('bg-image-css');
+        if (cssField) currentBgImageConfig.css = cssField.value;
+        
+        const toggle = document.getElementById('bg-image-toggle');
+        if (toggle) toggle.checked = true;
+        currentBgImageConfig.enabled = true;
+
+        applyPreviewBackgroundImage();
+        renderSlideGrid();
+        broadcastPayload({ type: 'BG_IMAGE_UPDATE', background: currentBgImageConfig });
+        showToast("Background image loaded and applied!");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function toggleBackgroundImageState() {
+      const toggle = document.getElementById('bg-image-toggle');
+      currentBgImageConfig.enabled = toggle ? toggle.checked : false;
+
+      applyPreviewBackgroundImage();
+      renderSlideGrid();
+      broadcastPayload({ type: 'BG_IMAGE_UPDATE', background: currentBgImageConfig });
+    }
+
+    function updateBackgroundImageStyles() {
+      const cssField = document.getElementById('bg-image-css');
+      if (!cssField) return;
+      
+      currentBgImageConfig.css = cssField.value;
+      applyPreviewBackgroundImage();
+      renderSlideGrid();
+      if (currentBgImageConfig.enabled) {
+        broadcastPayload({ type: 'BG_IMAGE_UPDATE', background: currentBgImageConfig });
+      }
+    }
+
+    // Apply the exact background-image configuration used by Display.html.
+    // Keep this as one shared path for the live preview and every slide thumbnail
+    // so size/position/repeat/color/blend settings cannot drift between surfaces.
+    function applyBackgroundImageConfigToElement(element) {
+      if (!element) return;
+      if (currentBgImageConfig.enabled && currentBgImageConfig.dataUrl) {
+        element.style.cssText = currentBgImageConfig.css || '';
+        element.style.backgroundImage = `url('${currentBgImageConfig.dataUrl}')`;
+      } else {
+        element.style.backgroundImage = 'none';
+        element.style.backgroundBlendMode = '';
+        element.style.backgroundSize = '';
+        element.style.backgroundPosition = '';
+        element.style.backgroundRepeat = '';
+        element.style.backgroundColor = '';
+      }
+    }
+
+    function applyPreviewBackgroundImage() {
+      const previewScreen = document.getElementById('preview-screen');
+      if (!previewScreen) return;
+
+      if (currentBgImageConfig.enabled && currentBgImageConfig.dataUrl) {
+        window.BibleSermonDisplayRenderer.setBackground(previewScreen, currentBgImageConfig, displayBgColor);
+      } else {
+        // Clear stale image-CSS properties before applying the selected fallback mode.
+        previewScreen.style.backgroundImage = 'none';
+        previewScreen.style.backgroundBlendMode = '';
+        previewScreen.style.backgroundSize = '';
+        previewScreen.style.backgroundPosition = '';
+        previewScreen.style.backgroundRepeat = '';
+        previewScreen.style.backgroundColor = '';
+        if (currentBgMode === 'css') {
+          applyPreviewCustomCss(customBgCssValue);
+        } else {
+          previewScreen.style.backgroundColor = displayBgColor;
+        }
+      }
+    }
+
+    function initChannel() {
+      channel = new BroadcastChannel(CHANNEL_NAME);
+      document.getElementById('status-dot').classList.add('active');
+      document.getElementById('status-text').textContent = 'BROADCAST ACTIVE';
+
+      channel.onmessage = (event) => {
+        const data = event.data;
+        if (data && data.type === 'BIBLE_SERMON_PRO_SYNC_REQUEST') {
+          broadcastCurrentState();
+        }
+      };
+
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'bible_sermon_pro_sync_request_v1') {
+          broadcastCurrentState();
+        }
+      });
+    }
+
+    function extractHtmlTagAndCleanRules(rawRules) {
+      if (!rawRules) return { tag: null, rules: '' };
+      const lines = rawRules.split('\n');
+      let tag = null;
+      let cleanRulesLines = [];
+
+      lines.forEach((line, idx) => {
+        const trimmed = line.trim();
+        if (idx === 0 && trimmed.startsWith('/*') && trimmed.endsWith('*/')) {
+          const match = trimmed.match(/\/\*\s*#\s*([a-zA-Z0-9]+)\s*#\s*\*\//);
+          if (match) {
+            tag = match[1].toLowerCase();
+            return;
+          }
+        }
+        cleanRulesLines.push(line);
+      });
+
+      return { tag: tag, rules: cleanRulesLines.join('\n').trim() };
+    }
+
+    function broadcastCurrentState() {
+      const session = getCurrentSession();
+      if (!session) return;
+      
+      const partField = document.getElementById('partscreen-css');
+      const fullField = document.getElementById('fullscreen-css');
+      if (partField) currentScreenConfig.partCss = partField.value;
+      if (fullField) currentScreenConfig.fullCss = fullField.value;
+
+      if (currentBgMode === 'css') {
+        broadcastPayload({ type: 'BG_CUSTOM_CSS_UPDATE', bgCss: customBgCssValue });
+      } else {
+        broadcastPayload({ type: 'COLOR_UPDATE', bgColor: displayBgColor });
+      }
+
+      broadcastPayload({ type: 'ANIMATION_UPDATE', animation: currentAnimationConfig });
+      broadcastPayload({ type: 'SCREEN_CONFIG_UPDATE', screenConfig: currentScreenConfig });
+      if (currentBgImageConfig.dataUrl || currentBgImageConfig.enabled) {
+        broadcastPayload({ type: 'BG_IMAGE_UPDATE', background: currentBgImageConfig });
+      }
+
+      let rawClassRules = '';
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      Object.keys(defaults).forEach(cls => {
+        const parsed = extractHtmlTagAndCleanRules(defaults[cls]);
+        rawClassRules += `.${cls} { ${parsed.rules} }\n`;
+      });
+      savedCustomStylesStore.forEach(item => {
+        if (item.name && item.rules) {
+          const parsed = extractHtmlTagAndCleanRules(item.rules);
+          rawClassRules += `.${item.name} { ${parsed.rules} }\n`;
+        }
+      });
+      Object.keys(session.userCssStore).forEach(cls => {
+        const entry = session.userCssStore[cls];
+        if (entry && entry.rules) {
+          const parsed = extractHtmlTagAndCleanRules(entry.rules);
+          if (parsed.rules) rawClassRules += `.${cls} { ${parsed.rules} }\n`;
+        }
+      });
+      broadcastPayload({ type: 'CSS_UPDATE', cssRules: rawClassRules });
+
+      if (session.activeSlideIndex >= 0 && session.activeSlideIndex < session.parsedSlides.length) {
+        const slide = session.parsedSlides[session.activeSlideIndex];
+        broadcastPayload({
+          type: 'UPDATE',
+          title: slide.htmlTitle || '',
+          content: slide.htmlBody,
+          align: session.alignment,
+          bgColor: currentBgMode === 'css' ? '' : displayBgColor,
+          animation: currentAnimationConfig,
+          screenConfig: currentScreenConfig
+        });
+      }
+    }
+
+    function initResizers() {
+      initResizer('css-sidebar-resizer', 'css-sidebar', 220, 600);
+      initResizer('preview-col-resizer', 'preview-col', 200, 700);
+    }
+
+    function initResizer(resizerId, sidebarId, minWidth = 200, maxWidth = 700) {
+      const resizer = document.getElementById(resizerId);
+      const sidebar = document.getElementById(sidebarId);
+      if (!resizer || !sidebar) return;
+
+      let isResizing = false;
+      resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        resizer.classList.add('resizing');
+        document.body.style.cursor = 'ew-resize';
+        e.preventDefault();
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const rect = sidebar.getBoundingClientRect();
+        const newWidth = rect.right - e.clientX;
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+          sidebar.style.width = newWidth + 'px';
+        }
+      });
+      window.addEventListener('mouseup', () => {
+        if (isResizing) {
+          isResizing = false;
+          resizer.classList.remove('resizing');
+          document.body.style.cursor = 'default';
+        }
+      });
+    }
+
+    function renderIcons() {
+      const toolbar = document.getElementById('toolbar');
+      if (toolbar && window.BSP_ICONS) {
+        toolbar.innerHTML = `
+          <button class="icon-btn" title="Insert Slide (##)" onclick="insertHeader()">${BSP_ICONS.insertHeader}</button>
+          <div class="tool-divider"></div>
+          <button class="icon-btn" title="Undo (Ctrl+Z)" onclick="undoSession()">${BSP_ICONS.undo}</button>
+          <button class="icon-btn" title="Redo (Ctrl+Y)" onclick="redoSession()">${BSP_ICONS.redo}</button>
+          <div class="tool-divider"></div>
+          <button class="icon-btn" title="Bold (**)" onclick="formatText('bold')">${BSP_ICONS.bold}</button>
+          <button class="icon-btn" title="Italic (_)" onclick="formatText('italic')">${BSP_ICONS.italic}</button>
+          <button class="icon-btn" title="Underline (__)" onclick="formatText('underline')">${BSP_ICONS.underline}</button>
+          <button class="icon-btn" title="Bullet List" onclick="formatText('bullet')">${BSP_ICONS.bullet}</button>
+          <div class="tool-divider"></div>
+          <button class="icon-btn hide" title="Align Left" onclick="setAlignment('left')">${BSP_ICONS.alignLeft}</button>
+          <button class="icon-btn hide" title="Align Center" onclick="setAlignment('center')">${BSP_ICONS.alignCenter}</button>
+          <button class="icon-btn hide" title="Align Right" onclick="setAlignment('right')">${BSP_ICONS.alignRight}</button>
+          <button class="icon-btn hide" title="Justify" onclick="setAlignment('justify')">${BSP_ICONS.alignJustify}</button>
+          <div class="tool-divider hide"></div>
+          <button class="icon-btn" title="Load Session File" onclick="document.getElementById('file-input').click()">${BSP_ICONS.load}</button>
+          <button class="icon-btn" title="Save Session File" onclick="saveSessionToFile()">${BSP_ICONS.save}</button>
+          <input type="file" id="file-input" accept=".bsp,.txt" style="display:none;" onchange="loadSessionFromFile(event)">
+          <div class="toolbar-spacer"></div>
+          <button class="icon-btn" title="Toggle CSS Menu" onclick="toggleCssSidebar()">${BSP_ICONS.cssMenu}</button>
+        `;
+      }
+      const previewToggle = document.getElementById('preview-toggle-btn');
+      if (previewToggle && window.BSP_ICONS) {
+        previewToggle.innerHTML = BSP_ICONS.preview;
+      }
+
+      if (window.BSP_ICONS) {
+        const iconPrev = document.getElementById('icon-prev');
+        const iconLocate = document.getElementById('icon-locate');
+        const iconNext = document.getElementById('icon-next');
+        const iconAutoSync = document.getElementById('icon-autosync');
+        if (iconPrev) iconPrev.innerHTML = BSP_ICONS.prevSlide;
+        if (iconLocate) iconLocate.innerHTML = BSP_ICONS.locateCursor;
+        if (iconNext) iconNext.innerHTML = BSP_ICONS.nextSlide;
+        if (iconAutoSync) iconAutoSync.innerHTML = BSP_ICONS.autoSync;
+      }
+    }
+
+    function toggleCssSidebar() {
+      document.getElementById('css-sidebar').classList.toggle('hidden');
+    }
+
+    function togglePreviewBox() {
+      document.getElementById('preview-col').classList.toggle('hidden');
+    }
+
+    function renderDefaultClasses() {
+      const container = document.getElementById('default-class-list');
+      if (!container) return;
+      container.innerHTML = '';
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      Object.keys(defaults).forEach(cls => {
+        const item = document.createElement('div');
+        item.className = 'class-item';
+        item.innerHTML = `
+          <div class="class-item-title readonly">.${cls}</div>
+          <textarea readonly>${defaults[cls]}</textarea>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function loadStoredSavedCustomStyles() {
+      const raw = localStorage.getItem('bsp_saved_custom_styles');
+      if (raw) {
+        try {
+          savedCustomStylesStore = JSON.parse(raw);
+          savedCustomStylesStore.forEach(s => s.isEditing = false);
+        } catch(e) {
+          savedCustomStylesStore = [];
+        }
+      }
+      renderSavedCustomStyles();
+    }
+
+    function renderSavedCustomStyles() {
+      const container = document.getElementById('saved-class-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (savedCustomStylesStore.length === 0) {
+        container.innerHTML = `<small style="color: var(--text-muted);">No saved custom styles yet. Click '+' to add one.</small>`;
+        return;
+      }
+
+      savedCustomStylesStore.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'class-item';
+
+        if (item.isEditing) {
+          div.innerHTML = `
+            <div class="class-item-header">
+              <input type="text" class="class-title-input" value="${escapeHtml(item.name)}" placeholder="style-name" oninput="updateSavedStyleTempName('${item.id}', this.value)">
+              <button class="btn-icon-action" title="Done Editing" onclick="toggleEditSavedStyle('${item.id}', false)">✓</button>
+            </div>
+            <textarea placeholder="e.g. /* # li # */\ncolor: #38b6ff;" oninput="updateSavedStyleTempRules('${item.id}', this.value)">${escapeHtml(item.rules)}</textarea>
+          `;
+        } else {
+          div.innerHTML = `
+            <div class="class-item-header">
+              <span class="class-item-title saved-title">.${escapeHtml(item.name || 'unnamed')}</span>
+              <div style="display:flex; gap: 4px;">
+                <button class="btn-icon-action" title="Edit Style" onclick="toggleEditSavedStyle('${item.id}', true)">✏️</button>
+                <button class="btn-icon-action btn-delete-class" title="Delete Style" onclick="deleteSavedStyle('${item.id}')">&times;</button>
+              </div>
+            </div>
+            <textarea readonly>${escapeHtml(item.rules)}</textarea>
+          `;
+        }
+        container.appendChild(div);
+      });
+      applyAndBroadcastScopedStyles();
+    }
+
+    function addNewSavedStyleSlot() {
+      const newId = 'saved_' + Date.now().toString(36);
+      savedCustomStylesStore.push({
+        id: newId,
+        name: 'custom-class-' + (savedCustomStylesStore.length + 1),
+        rules: 'color: #38b6ff; font-weight: bold;',
+        isEditing: true
+      });
+      renderSavedCustomStyles();
+    }
+
+    function toggleEditSavedStyle(id, state) {
+      const item = savedCustomStylesStore.find(s => s.id === id);
+      if (item) {
+        item.isEditing = state;
+        if (!state) checkDuplicateStyleName(item.name);
+        renderSavedCustomStyles();
+      }
+    }
+
+    function updateSavedStyleTempName(id, val) {
+      const item = savedCustomStylesStore.find(s => s.id === id);
+      if (item) item.name = val.trim().replace(/^\./, '');
+    }
+
+    function updateSavedStyleTempRules(id, val) {
+      const item = savedCustomStylesStore.find(s => s.id === id);
+      if (item) item.rules = val;
+    }
+
+    function checkDuplicateStyleName(name) {
+      if (!name) return;
+      const cleanName = name.toLowerCase();
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      const isDefault = Object.keys(defaults).some(k => k.toLowerCase() === cleanName);
+      const isOtherSaved = savedCustomStylesStore.filter(s => s.name.toLowerCase() === cleanName).length > 1;
+
+      if (isDefault || isOtherSaved) {
+        showToast("Note: This style name already exists and may override existing styles.");
+      }
+    }
+
+    function deleteSavedStyle(id) {
+      const item = savedCustomStylesStore.find(s => s.id === id);
+      if (!item) return;
+      if (confirm(`Are you sure you want to delete saved style '.${item.name}'?`)) {
+        savedCustomStylesStore = savedCustomStylesStore.filter(s => s.id !== id);
+        localStorage.setItem('bsp_saved_custom_styles', JSON.stringify(savedCustomStylesStore));
+        renderSavedCustomStyles();
+      }
+    }
+
+    function saveCustomStylesToSystem() {
+      savedCustomStylesStore.forEach(s => s.isEditing = false);
+      renderSavedCustomStyles();
+      localStorage.setItem('bsp_saved_custom_styles', JSON.stringify(savedCustomStylesStore));
+      
+      const defaultName = 'custom-styles.js';
+      const dialog = document.getElementById('styles-save-dialog');
+      const input = document.getElementById('styles-save-filename');
+      input.value = defaultName;
+      dialog.style.display = 'flex';
+      input.focus();
+      input.select();
+    }
+
+    function closeStylesSaveDialog() {
+      document.getElementById('styles-save-dialog').style.display = 'none';
+      showToast('Save cancelled.');
+    }
+
+    async function saveStylesWithFilename() {
+      const input = document.getElementById('styles-save-filename');
+      let enteredName = (input.value || '').trim().replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/[. ]+$/, '');
+      if (!enteredName) {
+        input.focus();
+        showToast('Please enter a valid filename.');
+        return;
+      }
+      const filename = /\.js$/i.test(enteredName) ? enteredName : `${enteredName.replace(/\.[^.]+$/, '')}.js`;
+      document.getElementById('styles-save-dialog').style.display = 'none';
+
+      let jsContent = `// Sermon Presenter - Saved Custom Styles\nwindow.SAVED_CUSTOM_STYLES = {\n`;
+      savedCustomStylesStore.forEach((item, idx) => {
+        if (item.name) {
+          const escapedRules = item.rules.replace(/'/g, "\\'");
+          jsContent += `  "${item.name}": \`${escapedRules}\`${idx < savedCustomStylesStore.length - 1 ? ',' : ''}\n`;
+        }
+      });
+      jsContent += `};\n`;
+
+      if (/OBS/i.test(navigator.userAgent || '')) {
+        showManualStylesSaveDialog(filename, jsContent);
+        return;
+      }
+
+      if (typeof window.showSaveFilePicker === 'function') {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'JavaScript Style File', accept: { 'text/javascript': ['.js'] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(jsContent);
+          await writable.close();
+          showToast('Styles saved and exported successfully!');
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+
+      try {
+        const blob = new Blob([jsContent], { type: 'text/javascript;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => { link.remove(); URL.revokeObjectURL(objectUrl); }, 15000);
+        showToast('Styles saved to storage & download requested!');
+      } catch (err) {
+        alert('Could not prepare the styles download.');
+      }
+    }
+
+    function showManualStylesSaveDialog(filename, fileContent) {
+      document.getElementById('styles-manual-save-name').textContent = filename;
+      document.getElementById('styles-manual-save-content').value = fileContent;
+      document.getElementById('styles-manual-save-dialog').style.display = 'flex';
+    }
+
+    function closeManualStylesSaveDialog() {
+      document.getElementById('styles-manual-save-dialog').style.display = 'none';
+    }
+
+    function selectManualStylesContent() {
+      const content = document.getElementById('styles-manual-save-content');
+      content.focus();
+      content.select();
+    }
+
+    async function copyManualStylesContent() {
+      const content = document.getElementById('styles-manual-save-content');
+      try {
+        await navigator.clipboard.writeText(content.value);
+        showToast('Copied styles to clipboard.');
+      } catch (err) {
+        content.select();
+      }
+    }
+
+    function importCustomStylesFromFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        let count = 0;
+        const match = text.match(/window\.SAVED_CUSTOM_STYLES\s*=\s*(\{[\s\S]*?\});/);
+        let obj = null;
+        if (match) {
+          try { obj = eval('(' + match[1] + ')'); } catch(err){}
+        } else {
+          try { obj = JSON.parse(text); } catch(err){}
+        }
+
+        if (obj && typeof obj === 'object') {
+          Object.keys(obj).forEach(cls => {
+            const exists = savedCustomStylesStore.find(s => s.name === cls);
+            if (!exists) {
+              savedCustomStylesStore.push({
+                id: 'saved_' + Math.random().toString(36).substr(2, 9),
+                name: cls,
+                rules: obj[cls],
+                isEditing: false
+              });
+              count++;
+            }
+          });
+          localStorage.setItem('bsp_saved_custom_styles', JSON.stringify(savedCustomStylesStore));
+          renderSavedCustomStyles();
+          showToast(`Imported ${count} new custom styles!`);
+        } else {
+          alert("Could not parse valid custom styles from file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function loadStoredSettings() {
+      const savedFps = localStorage.getItem('bsp_target_fps');
+      if (savedFps) {
+        targetFps = parseInt(savedFps, 10);
+        const fpsInput = document.getElementById('target-fps');
+        if (fpsInput) fpsInput.value = targetFps;
+      }
+
+      const savedBgMode = localStorage.getItem('bsp_bg_mode');
+      if (savedBgMode) {
+        switchBgMode(savedBgMode);
+      }
+
+      const savedCustomCss = localStorage.getItem('bsp_custom_bg_css');
+      if (savedCustomCss) {
+        customBgCssValue = savedCustomCss;
+        const cssArea = document.getElementById('custom-bg-css');
+        if (cssArea) cssArea.value = savedCustomCss;
+        if (currentBgMode === 'css') applyCustomBgCss(savedCustomCss);
+      }
+
+      const savedBg = localStorage.getItem('bsp_display_bg');
+      if (savedBg) {
+        displayBgColor = normalizeSettingsColorToRgba(savedBg);
+        const bgPickerInput = document.getElementById('bg-color-picker-element');
+        if (bgPickerInput) bgPickerInput.value = normalizeSettingsColorToRgba(savedBg);
+        if (currentBgMode === 'picker') applyBgColor(savedBg, false);
+      }
+
+      ['header', 'class', 'block', 'block-reset'].forEach(type => {
+        const saved = localStorage.getItem(`bsp_color_${type}`);
+        if (saved) updateSyntaxColor(type, saved, false);
+      });
+
+      const savedBlockTint = localStorage.getItem('bsp_scope_tint_block');
+      if (savedBlockTint) updateScopeTint('block', savedBlockTint, false);
+
+      const savedBlockBorder = localStorage.getItem('bsp_scope_tint_block_border');
+      if (savedBlockBorder) updateScopeBorder('block', savedBlockBorder, false);
+
+      const savedPersistentTint = localStorage.getItem('bsp_scope_tint_persistent');
+      if (savedPersistentTint) updateScopeTint('persistent', savedPersistentTint, false);
+
+      const savedPersistentBorder = localStorage.getItem('bsp_scope_tint_persistent_border');
+      if (savedPersistentBorder) updateScopeBorder('persistent', savedPersistentBorder, false);
+
+      const savedGap = localStorage.getItem('bsp_scope_gap');
+      if (savedGap !== null) updateScopeGap(savedGap, false);
+
+      applyPreviewScreenConfig(currentScreenConfig);
+    }
+
+    function updateSyntaxColor(type, colorValue, save = true) {
+      const normalized = normalizeSettingsColorToRgba(colorValue);
+      if (type === 'header') {
+        document.documentElement.style.setProperty('--syntax-header', normalized);
+        const input = document.getElementById('picker-header');
+        if (input && input.value !== normalized) input.value = normalized;
+        if (save) localStorage.setItem('bsp_color_header', normalized);
+      } else if (type === 'class') {
+        document.documentElement.style.setProperty('--syntax-class', normalized);
+        const input = document.getElementById('picker-class');
+        if (input && input.value !== normalized) input.value = normalized;
+        if (save) localStorage.setItem('bsp_color_class', normalized);
+      } else if (type === 'block') {
+        document.documentElement.style.setProperty('--syntax-block', normalized);
+        const input = document.getElementById('picker-block');
+        if (input && input.value !== normalized) input.value = normalized;
+        if (save) localStorage.setItem('bsp_color_block', normalized);
+      } else if (type === 'block-reset') {
+        document.documentElement.style.setProperty('--syntax-block-reset', normalized);
+        const input = document.getElementById('picker-block-reset');
+        if (input && input.value !== normalized) input.value = normalized;
+        if (save) localStorage.setItem('bsp_color_block_reset', normalized);
+      }
+    }
+
+    function updateScopeTint(type, value, save = true) {
+      if (!value || !value.trim()) return;
+      const trimmed = normalizeSettingsColorToRgba(value);
+
+      if (type === 'block') {
+        document.documentElement.style.setProperty('--scope-tint-block-bg', trimmed);
+        const input = document.getElementById('picker-scope-block');
+        if (input && input.value !== trimmed) input.value = trimmed;
+        if (save) localStorage.setItem('bsp_scope_tint_block', trimmed);
+      } else if (type === 'persistent') {
+        document.documentElement.style.setProperty('--scope-tint-persistent-bg', trimmed);
+        const input = document.getElementById('picker-scope-persistent');
+        if (input && input.value !== trimmed) input.value = trimmed;
+        if (save) localStorage.setItem('bsp_scope_tint_persistent', trimmed);
+      }
+    }
+
+    function updateScopeBorder(type, value, save = true) {
+      if (!value || !value.trim()) return;
+      const normalized = normalizeSettingsColorToRgba(value);
+
+      if (type === 'block') {
+        document.documentElement.style.setProperty('--scope-tint-block-border', normalized);
+        const input = document.getElementById('picker-scope-block-border');
+        if (input && input.value !== normalized) input.value = normalized;
+        if (save) localStorage.setItem('bsp_scope_tint_block_border', normalized);
+      } else if (type === 'persistent') {
+        document.documentElement.style.setProperty('--scope-tint-persistent-border', normalized);
+        const input = document.getElementById('picker-scope-persistent-border');
+        if (input && input.value !== normalized) input.value = normalized;
+        if (save) localStorage.setItem('bsp_scope_tint_persistent_border', normalized);
+      }
+    }
+
+    function updateScopeGap(val, save = true) {
+      const parsed = Math.max(0, Math.min(8, parseInt(val, 10) || 0));
+      const pxValue = `${parsed}px`;
+
+      document.documentElement.style.setProperty('--scope-gap', pxValue);
+      
+      const rangeElem = document.getElementById('scope-gap-range');
+      const inputElem = document.getElementById('scope-gap-input');
+      if (rangeElem && rangeElem.value != parsed) rangeElem.value = parsed;
+      if (inputElem && inputElem.value != parsed) inputElem.value = parsed;
+
+      if (codeMirrorEditor) {
+        codeMirrorEditor.refresh();
+      }
+
+      if (save) {
+        localStorage.setItem('bsp_scope_gap', parsed);
+      }
+    }
+
+    function saveFpsSetting(val) {
+      const parsed = parseInt(val, 10);
+      if (parsed >= 1 && parsed <= 60) {
+        targetFps = parsed;
+        localStorage.setItem('bsp_target_fps', targetFps);
+      }
+    }
+
+    function resetSettingsToDefault() {
+      if (!confirm("Are you sure you want to reset all settings to default values?")) return;
+      
+      localStorage.removeItem('bsp_target_fps');
+      localStorage.removeItem('bsp_display_bg');
+      localStorage.removeItem('bsp_bg_mode');
+      localStorage.removeItem('bsp_custom_bg_css');
+      localStorage.removeItem('bsp_color_header');
+      localStorage.removeItem('bsp_color_class');
+      localStorage.removeItem('bsp_color_block');
+      localStorage.removeItem('bsp_color_block_reset');
+      localStorage.removeItem('bsp_scope_tint_block');
+      localStorage.removeItem('bsp_scope_tint_block_border');
+      localStorage.removeItem('bsp_scope_tint_persistent');
+      localStorage.removeItem('bsp_scope_tint_persistent_border');
+      localStorage.removeItem('bsp_scope_gap');
+
+      targetFps = 30;
+      document.getElementById('target-fps').value = 30;
+
+      switchBgMode('picker');
+      document.getElementById('bg-color-picker-element').value = '#121218';
+      updateSyntaxColor('header', '#4EC9B0', false);
+      updateSyntaxColor('class', '#CE9178', false);
+      updateSyntaxColor('block', '#DCDCAA', false);
+      updateSyntaxColor('block-reset', '#C586C0', false);
+      updateScopeTint('block', 'rgba(220, 220, 170, 0.12)', false);
+      updateScopeBorder('block', '#DCDCAA', false);
+      updateScopeTint('persistent', 'rgba(197, 134, 192, 0.14)', false);
+      updateScopeBorder('persistent', '#C586C0', false);
+      updateScopeGap(2, false);
+
+      showToast("Settings reset to defaults!");
+    }
+
+    function exportSettingsToFile() {
+      const defaultName = 'sermon-presenter-settings.json';
+      const dialog = document.getElementById('settings-save-dialog');
+      const input = document.getElementById('settings-save-filename');
+      input.value = defaultName;
+      dialog.style.display = 'flex';
+      input.focus();
+      input.select();
+    }
+
+    function closeSettingsSaveDialog() {
+      document.getElementById('settings-save-dialog').style.display = 'none';
+      showToast('Export cancelled.');
+    }
+
+    async function saveSettingsWithFilename() {
+      const input = document.getElementById('settings-save-filename');
+      let enteredName = (input.value || '').trim().replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/[. ]+$/, '');
+      if (!enteredName) {
+        input.focus();
+        showToast('Please enter a valid filename.');
+        return;
+      }
+      const filename = /\.json$/i.test(enteredName) ? enteredName : `${enteredName.replace(/\.[^.]+$/, '')}.json`;
+      document.getElementById('settings-save-dialog').style.display = 'none';
+
+      const settingsData = {
+        targetFps: targetFps,
+        displayBgColor: displayBgColor,
+        bgMode: currentBgMode,
+        customBgCss: customBgCssValue,
+        scopeGap: localStorage.getItem('bsp_scope_gap') || 2,
+        colors: {
+          header: localStorage.getItem('bsp_color_header') || '#4EC9B0',
+          class: localStorage.getItem('bsp_color_class') || '#CE9178',
+          block: localStorage.getItem('bsp_color_block') || '#DCDCAA',
+          blockReset: localStorage.getItem('bsp_color_block_reset') || '#C586C0',
+          scopeTintBlock: localStorage.getItem('bsp_scope_tint_block') || 'rgba(220, 220, 170, 0.12)',
+          scopeTintBlockBorder: localStorage.getItem('bsp_scope_tint_block_border') || '#DCDCAA',
+          scopeTintPersistent: localStorage.getItem('bsp_scope_tint_persistent') || 'rgba(197, 134, 192, 0.14)',
+          scopeTintPersistentBorder: localStorage.getItem('bsp_scope_tint_persistent_border') || '#C586C0'
+        }
+      };
+
+      const fileContent = JSON.stringify(settingsData, null, 2);
+      if (/OBS/i.test(navigator.userAgent || '')) {
+        showManualSettingsSaveDialog(filename, fileContent);
+        return;
+      }
+
+      if (typeof window.showSaveFilePicker === 'function') {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'JSON Settings File', accept: { 'application/json': ['.json'] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(fileContent);
+          await writable.close();
+          showToast('Settings exported successfully!');
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+
+      try {
+        const blob = new Blob([fileContent], { type: 'application/json;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => { link.remove(); URL.revokeObjectURL(objectUrl); }, 15000);
+        showToast('Settings export download requested!');
+      } catch (err) {
+        alert('Could not prepare the settings download.');
+      }
+    }
+
+    function showManualSettingsSaveDialog(filename, fileContent) {
+      document.getElementById('settings-manual-save-name').textContent = filename;
+      document.getElementById('settings-manual-save-content').value = fileContent;
+      document.getElementById('settings-manual-save-dialog').style.display = 'flex';
+    }
+
+    function closeManualSettingsSaveDialog() {
+      document.getElementById('settings-manual-save-dialog').style.display = 'none';
+    }
+
+    function selectManualSettingsContent() {
+      const content = document.getElementById('settings-manual-save-content');
+      content.focus();
+      content.select();
+    }
+
+    async function copyManualSettingsContent() {
+      const content = document.getElementById('settings-manual-save-content');
+      try {
+        await navigator.clipboard.writeText(content.value);
+        showToast('Copied settings to clipboard.');
+      } catch (err) {
+        content.select();
+      }
+    }
+
+    function importSettingsFromFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.targetFps) {
+            targetFps = data.targetFps;
+            localStorage.setItem('bsp_target_fps', targetFps);
+            const fpsInput = document.getElementById('target-fps');
+            if (fpsInput) fpsInput.value = targetFps;
+          }
+          if (data.bgMode) {
+            switchBgMode(data.bgMode);
+          }
+          if (data.customBgCss) {
+            customBgCssValue = data.customBgCss;
+            const cssArea = document.getElementById('custom-bg-css');
+            if (cssArea) cssArea.value = data.customBgCss;
+            if (currentBgMode === 'css') applyCustomBgCss(data.customBgCss);
+          }
+          if (data.displayBgColor) {
+            displayBgColor = normalizeSettingsColorToRgba(data.displayBgColor);
+            const bgPicker = document.getElementById('bg-color-picker-element');
+            if (bgPicker) bgPicker.value = displayBgColor;
+            if (currentBgMode === 'picker') applyBgColor(displayBgColor);
+          }
+          if (data.scopeGap !== undefined) {
+            updateScopeGap(data.scopeGap);
+          }
+          if (data.colors) {
+            if (data.colors.header) updateSyntaxColor('header', data.colors.header);
+            if (data.colors.class) updateSyntaxColor('class', data.colors.class);
+            if (data.colors.block) updateSyntaxColor('block', data.colors.block);
+            if (data.colors.blockReset) updateSyntaxColor('block-reset', data.colors.blockReset);
+            if (data.colors.scopeTintBlock) updateScopeTint('block', data.colors.scopeTintBlock);
+            if (data.colors.scopeTintBlockBorder) updateScopeBorder('block', data.colors.scopeTintBlockBorder);
+            if (data.colors.scopeTintPersistent) updateScopeTint('persistent', data.colors.scopeTintPersistent);
+            if (data.colors.scopeTintPersistentBorder) updateScopeBorder('persistent', data.colors.scopeTintPersistentBorder);
+          }
+          showToast("Settings imported successfully!");
+          bspLog("Settings imported successfully from file.");
+        } catch (err) {
+          bspLog("Failed to parse settings JSON file.", err, 'ERROR');
+          alert("Failed to parse settings JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function applyExternalSettingsFile() {
+      if (window.BSP_USER_SETTINGS) {
+        const data = window.BSP_USER_SETTINGS;
+        
+        if (data.targetFps) {
+          targetFps = data.targetFps;
+          localStorage.setItem('bsp_target_fps', targetFps);
+          const fpsInput = document.getElementById('target-fps');
+          if (fpsInput) fpsInput.value = targetFps;
+        }
+        if (data.bgMode) switchBgMode(data.bgMode);
+        if (data.customBgCss) {
+          customBgCssValue = data.customBgCss;
+          const cssArea = document.getElementById('custom-bg-css');
+          if (cssArea) cssArea.value = data.customBgCss;
+          if (currentBgMode === 'css') applyCustomBgCss(data.customBgCss);
+        }
+        if (data.displayBgColor) {
+          displayBgColor = normalizeSettingsColorToRgba(data.displayBgColor);
+          const bgPicker = document.getElementById('bg-color-picker-element');
+          if (bgPicker) bgPicker.value = displayBgColor;
+          if (currentBgMode === 'picker') applyBgColor(displayBgColor);
+        }
+        if (data.scopeGap !== undefined) updateScopeGap(data.scopeGap);
+        if (data.colors) {
+          if (data.colors.header) updateSyntaxColor('header', data.colors.header);
+          if (data.colors.class) updateSyntaxColor('class', data.colors.class);
+          if (data.colors.block) updateSyntaxColor('block', data.colors.block);
+          if (data.colors.blockReset) updateSyntaxColor('block-reset', data.colors.blockReset);
+          if (data.colors.scopeTintBlock) updateScopeTint('block', data.colors.scopeTintBlock);
+          if (data.colors.scopeTintBlockBorder) updateScopeBorder('block', data.colors.scopeTintBlockBorder);
+          if (data.colors.scopeTintPersistent) updateScopeTint('persistent', data.colors.scopeTintPersistent);
+          if (data.colors.scopeTintPersistentBorder) updateScopeBorder('persistent', data.colors.scopeTintPersistentBorder);
+        }
+        bspLog("External settings.js applied successfully from head.");
+      } else {
+        bspLog("No external settings.js detected, using local storage defaults.");
+      }
+    }
+
+    function initDefaultSession() {
+      createNewSessionTab("Welcome & Worship");
+    }
+
+    function createNewSessionTab(title = "Untitled Session") {
+      const newId = 'sess_' + Math.random().toString(36).substr(2, 9);
+      const defaultText = `## Slide 1: Welcome\n#.gold-text Welcome to our Live Service!\nWe are glad you are here today.\n\n## Slide 2: Worship Chorus\n#..chorus Praise the Lord, O my soul!\nAll that is within me, bless His holy name.\n#..`;
+      
+      const newSession = {
+        id: newId,
+        title: title,
+        text: defaultText,
+        parsedSlides: [],
+        activeSlideIndex: -1,
+        alignment: 'center',
+        userCssStore: {},
+        history: [defaultText],
+        historyIndex: 0
+      };
+
+      sessions.push(newSession);
+      switchSession(newId);
+    }
+
+    function switchSession(id) {
+      currentSessionId = id;
+      const session = getCurrentSession();
+      if (!session) return;
+
+      if (codeMirrorEditor) {
+        codeMirrorEditor.setValue(session.text);
+      }
+      handleEditorInput(true);
+      renderSessionTabs();
+      updateEditorScopeHighlights();
+    }
+
+    function closeSessionTab(id, event) {
+      event.stopPropagation();
+      if (sessions.length <= 1) {
+        alert("You must keep at least one active session tab.");
+        return;
+      }
+      const index = sessions.findIndex(s => s.id === id);
+      if (index !== -1) {
+        sessions.splice(index, 1);
+        if (currentSessionId === id) {
+          switchSession(sessions[sessions.length - 1].id);
+        } else {
+          renderSessionTabs();
+        }
+      }
+    }
+
+    function renameSession(id, event) {
+      event.preventDefault();
+      const session = sessions.find(s => s.id === id);
+      if (!session) return;
+      const newName = prompt("Enter new session name:", session.title);
+      if (newName && newName.trim()) {
+        session.title = newName.trim();
+        renderSessionTabs();
+      }
+    }
+
+    function getCurrentSession() {
+      return sessions.find(s => s.id === currentSessionId);
+    }
+
+    function renderSessionTabs() {
+      const container = document.getElementById('session-tabs-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      sessions.forEach(sess => {
+        const tab = document.createElement('div');
+        tab.className = `session-tab ${sess.id === currentSessionId ? 'active' : ''}`;
+        tab.title = sess.title;
+        tab.onclick = () => switchSession(sess.id);
+        tab.oncontextmenu = (e) => renameSession(sess.id, e);
+        tab.innerHTML = `
+          <span>${escapeHtml(sess.title)}</span>
+          <button class="close-tab" onclick="closeSessionTab('${sess.id}', event)">&times;</button>
+        `;
+        container.appendChild(tab);
+      });
+    }
+
+    function getTagForClassName(className) {
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      if (defaults[className]) {
+        const res = extractHtmlTagAndCleanRules(defaults[className]);
+        if (res.tag) return res.tag;
+      }
+      const saved = savedCustomStylesStore.find(s => s.name === className);
+      if (saved && saved.rules) {
+        const res = extractHtmlTagAndCleanRules(saved.rules);
+        if (res.tag) return res.tag;
+      }
+      const session = getCurrentSession();
+      if (session && session.userCssStore[className] && session.userCssStore[className].rules) {
+        const res = extractHtmlTagAndCleanRules(session.userCssStore[className].rules);
+        if (res.tag) return res.tag;
+      }
+      return null;
+    }
+
+    function preprocessPersistentBlocks(rawText) {
+      const lines = rawText.split('\n');
+      let activePersistentClass = null;
+      let activeCycleClasses = null;
+      let cycleIndex = 0;
+      
+      const processedLines = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        let trimmed = line.trim();
+
+        if (trimmed === '#..#' || trimmed === '#..') {
+          activePersistentClass = null;
+          activeCycleClasses = null;
+          cycleIndex = 0;
+          continue; 
+        }
+
+        if (trimmed.startsWith('#..#')) {
+          const rest = trimmed.slice(4).trim();
+          const cycleMatch = rest.match(/^\(([^)]+)\)/);
+          let content = '';
+          
+          if (cycleMatch) {
+            activeCycleClasses = cycleMatch[1].split(',').map(c => c.trim()).filter(Boolean);
+            activePersistentClass = null;
+            cycleIndex = 0;
+            content = rest.slice(cycleMatch[0].length).trim();
+          } else {
+            const spaceIdx = rest.indexOf(' ');
+            activePersistentClass = spaceIdx !== -1 ? rest.substring(0, spaceIdx) : rest;
+            activeCycleClasses = null;
+            content = spaceIdx !== -1 ? rest.substring(spaceIdx + 1) : '';
+          }
+
+          if (content) {
+            const cls = activePersistentClass || activeCycleClasses[cycleIndex % activeCycleClasses.length];
+            if (activeCycleClasses) cycleIndex++;
+            processedLines.push(`#.${cls} ${content}`);
+          }
+          continue;
+        }
+
+        if (trimmed.startsWith('#.') || trimmed.startsWith('#..')) {
+          activePersistentClass = null;
+          activeCycleClasses = null;
+          cycleIndex = 0;
+          processedLines.push(line);
+          continue;
+        }
+
+        if (trimmed === '') {
+          processedLines.push(line);
+          continue;
+        }
+
+        if (trimmed.startsWith('##')) {
+          const contentAfterHash = trimmed.slice(2).trim();
+
+          if (contentAfterHash.startsWith('#..#')) {
+            const rest = contentAfterHash.slice(4).trim();
+            const cycleMatch = rest.match(/^\(([^)]+)\)/);
+            let titleText = '';
+
+            if (cycleMatch) {
+              activeCycleClasses = cycleMatch[1].split(',').map(c => c.trim()).filter(Boolean);
+              activePersistentClass = null;
+              cycleIndex = 0;
+              titleText = rest.slice(cycleMatch[0].length).trim();
+            } else {
+              const spaceIdx = rest.indexOf(' ');
+              activePersistentClass = spaceIdx !== -1 ? rest.substring(0, spaceIdx) : rest;
+              activeCycleClasses = null;
+              titleText = spaceIdx !== -1 ? rest.substring(spaceIdx + 1) : '';
+            }
+
+            const cls = activePersistentClass || (activeCycleClasses ? activeCycleClasses[cycleIndex % activeCycleClasses.length] : null);
+            if (activeCycleClasses && cls) cycleIndex++;
+
+            if (cls && titleText) {
+              processedLines.push(`## #.${cls} ${titleText}`);
+            } else if (titleText) {
+              processedLines.push(`## ${titleText}`);
+            } else {
+              processedLines.push(line);
+            }
+            continue;
+          }
+
+          if (activePersistentClass) {
+            processedLines.push(`## #.${activePersistentClass} ${contentAfterHash}`);
+          } else if (activeCycleClasses && activeCycleClasses.length > 0) {
+            const cls = activeCycleClasses[cycleIndex % activeCycleClasses.length];
+            cycleIndex++;
+            processedLines.push(`## #.${cls} ${contentAfterHash}`);
+          } else {
+            processedLines.push(line);
+          }
+          continue;
+        }
+
+        if (activePersistentClass) {
+          processedLines.push(`#.${activePersistentClass} ${line}`);
+        } else if (activeCycleClasses && activeCycleClasses.length > 0) {
+          const cls = activeCycleClasses[cycleIndex % activeCycleClasses.length];
+          cycleIndex++;
+          processedLines.push(`#.${cls} ${line}`);
+        } else {
+          processedLines.push(line);
+        }
+      }
+
+      return processedLines.join('\n');
+    }
+
+    function parseSermon(rawText) {
+      const preprocessedText = preprocessPersistentBlocks(rawText);
+
+      const blocks = preprocessedText.split(/^##\s+/m);
+      const slides = [];
+      const discoveredInText = new Set();
+      const session = getCurrentSession();
+      if (!session) return slides;
+
+      blocks.forEach((block, index) => {
+        const trimmed = block.trim();
+        if (!trimmed) return;
+
+        const lines = trimmed.split('\n');
+        const firstLine = lines[0] ? lines[0].trim() : '';
+        const bodyLines = lines;
+
+        const preserveSpaces = (text) => text.replace(/  /g, ' &nbsp;');
+
+        let parsedHtmlTitle = '';
+        let titleCleanText = `Slide ${index + 1}`;
+
+        if (firstLine) {
+          const match = firstLine.match(/^#\.(\([^)]+\)|[a-zA-Z0-9_-]+)\s+(.+)$/);
+          if (match) {
+            const cls = match[1];
+            const text = match[2];
+            const customTag = getTagForClassName(cls) || 'span';
+            parsedHtmlTitle = `<${customTag} class="${cls}">${escapeHtml(text)}</${customTag}>`;
+            titleCleanText = text;
+          } else if (firstLine.startsWith('#.')) {
+            const rest = firstLine.slice(2).trim();
+            const spaceIdx = rest.indexOf(' ');
+            const cls = spaceIdx !== -1 ? rest.substring(0, spaceIdx) : rest;
+            const text = spaceIdx !== -1 ? rest.substring(spaceIdx + 1) : '';
+            const customTag = getTagForClassName(cls) || 'span';
+            parsedHtmlTitle = `<${customTag} class="${cls}">${escapeHtml(text)}</${customTag}>`;
+            titleCleanText = text || firstLine;
+          } else {
+            parsedHtmlTitle = escapeHtml(firstLine);
+            titleCleanText = firstLine;
+          }
+        }
+
+        let formattedBodyHtml = '';
+        let activeBlockClass = null;
+        let activeBlockTag = 'div';
+        
+        let activeCycleClasses = null;
+        let cycleIndex = 0;
+
+        bodyLines.forEach((line) => {
+          let trimmedLine = line.trim();
+
+          if (trimmedLine === '#..') {
+            if (activeBlockClass) {
+              const closeTag = (activeBlockTag === 'li' || activeBlockTag === 'ol') ? 'ul' : activeBlockTag;
+              formattedBodyHtml += `</${closeTag}>`;
+              activeBlockClass = null;
+              activeBlockTag = 'div';
+            }
+            if (activeCycleClasses) {
+              activeCycleClasses = null;
+              cycleIndex = 0;
+            }
+            return;
+          }
+
+          const cycleMatch = trimmedLine.match(/^#\.\s*\(([^)]+)\)/) || trimmedLine.match(/^#\.\.\s*\(([^)]+)\)/);
+          if (cycleMatch) {
+            if (activeBlockClass) {
+              const closeTag = (activeBlockTag === 'li' || activeBlockTag === 'ol') ? 'ul' : activeBlockTag;
+              formattedBodyHtml += `</${closeTag}>`;
+              activeBlockClass = null;
+              activeBlockTag = 'div';
+            }
+
+            activeCycleClasses = cycleMatch[1].split(',').map(c => c.trim()).filter(Boolean);
+            cycleIndex = 0;
+
+            activeCycleClasses.forEach(cls => {
+              if (cls && cls.length > 1 && !cls.endsWith('-') && !cls.endsWith('.')) {
+                discoveredInText.add(cls);
+              }
+            });
+
+            const content = trimmedLine.slice(cycleMatch[0].length).trim();
+            if (content) {
+              const cls = activeCycleClasses[cycleIndex % activeCycleClasses.length];
+              cycleIndex++;
+              const customTag = getTagForClassName(cls) || 'span';
+              const formattedContent = formatInlineMarkup(content, preserveSpaces);
+              formattedBodyHtml += `<${customTag} class="${cls}">${formattedContent}</${customTag}><br>`;
+            }
+            return;
+          }
+
+          if (trimmedLine.startsWith('#..')) {
+            if (activeCycleClasses) {
+              activeCycleClasses = null;
+              cycleIndex = 0;
+            }
+
+            const rest = trimmedLine.slice(3).trim();
+            const spaceIdx = rest.indexOf(' ');
+            const className = spaceIdx !== -1 ? rest.substring(0, spaceIdx) : rest;
+            const content = spaceIdx !== -1 ? rest.substring(spaceIdx + 1) : '';
+
+            if (className && className.length > 1 && !className.endsWith('-') && !className.endsWith('.')) {
+              discoveredInText.add(className);
+            }
+
+            if (activeBlockClass) {
+              const closeTag = (activeBlockTag === 'li' || activeBlockTag === 'ol') ? 'ul' : activeBlockTag;
+              formattedBodyHtml += `</${closeTag}>`;
+            }
+
+            activeBlockClass = className;
+            activeBlockTag = getTagForClassName(className) || 'div';
+
+            const isList = (activeBlockTag === 'li' || activeBlockTag === 'ol');
+            const containerTag = isList ? 'ul' : activeBlockTag;
+
+            formattedBodyHtml += `<${containerTag} class="${className}">`;
+
+            if (content) {
+              const formattedContent = formatInlineMarkup(content, preserveSpaces);
+              formattedBodyHtml += isList ? `<li>${formattedContent}</li>` : `${formattedContent}<br>`;
+            }
+            return;
+          }
+
+          if (trimmedLine.startsWith('#.')) {
+            if (activeBlockClass) {
+              const closeTag = (activeBlockTag === 'li' || activeBlockTag === 'ol') ? 'ul' : activeBlockTag;
+              formattedBodyHtml += `</${closeTag}>`;
+              activeBlockClass = null;
+              activeBlockTag = 'div';
+            }
+            if (activeCycleClasses) {
+              activeCycleClasses = null;
+              cycleIndex = 0;
+            }
+
+            const res = trimmedLine.slice(2).trim();
+            const spaceIdx = res.indexOf(' ');
+            const className = spaceIdx !== -1 ? res.substring(0, spaceIdx) : res;
+            const content = spaceIdx !== -1 ? res.substring(spaceIdx + 1) : '';
+
+            if (className && className.length > 1 && !className.endsWith('-') && !className.endsWith('.')) {
+              discoveredInText.add(className);
+            }
+
+            const customTag = getTagForClassName(className) || 'span';
+            const formattedContent = formatInlineMarkup(content, preserveSpaces);
+            formattedBodyHtml += `<${customTag} class="${className}">${formattedContent}</${customTag}><br>`;
+            return;
+          }
+
+          if (activeCycleClasses && activeCycleClasses.length > 0) {
+            const cls = activeCycleClasses[cycleIndex % activeCycleClasses.length];
+            cycleIndex++;
+            const customTag = getTagForClassName(cls) || 'span';
+            const formattedLine = formatInlineMarkup(line, preserveSpaces);
+            formattedBodyHtml += `<${customTag} class="${cls}">${formattedLine}</${customTag}><br>`;
+            return;
+          }
+
+          const formattedLine = formatInlineMarkup(line, preserveSpaces);
+          if (activeBlockClass && (activeBlockTag === 'li' || activeBlockTag === 'ol')) {
+            formattedBodyHtml += `<li>${formattedLine}</li>`;
+          } else {
+            formattedBodyHtml += `${formattedLine}<br>`;
+          }
+        });
+
+        if (activeBlockClass) {
+          const closeTag = (activeBlockTag === 'li' || activeBlockTag === 'ol') ? 'ul' : activeBlockTag;
+          formattedBodyHtml += `</${closeTag}>`;
+        }
+
+        slides.push({
+          title: titleCleanText,
+          htmlTitle: parsedHtmlTitle,
+          rawBody: bodyLines.join('\n').trim(),
+          htmlBody: formattedBodyHtml
+        });
+      });
+
+      syncDiscoveredClasses(Array.from(discoveredInText));
+      return slides;
+    }
+
+    function formatInlineMarkup(str, preserveSpacesFn) {
+      if (!str) return '';
+      return preserveSpacesFn(str)
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/__(.*?)__/g, '<u>$1</u>')
+        .replace(/_(.*?)_/g, '<i>$1</i>')
+        .replace(/^\*\s+(.*)$/gm, '&bull; $1');
+    }
+
+    function syncDiscoveredClasses(activeInTextList) {
+      const session = getCurrentSession();
+      if (!session) return;
+      const activeSet = new Set(activeInTextList);
+      const systemDefaults = window.DEFAULT_SYSTEM_CLASSES || {};
+
+      Object.keys(session.userCssStore).forEach(cls => {
+        if (!session.userCssStore[cls]) {
+          session.userCssStore[cls] = { rules: '', active: false, expiresAt: null };
+        }
+        
+        const wasActive = session.userCssStore[cls].active;
+        const nowActive = activeSet.has(cls);
+        session.userCssStore[cls].active = nowActive;
+
+        if (wasActive && !nowActive && (!session.userCssStore[cls].rules || session.userCssStore[cls].rules.trim() === '')) {
+          session.userCssStore[cls].expiresAt = Date.now() + 5000;
+        } else if (nowActive) {
+          session.userCssStore[cls].expiresAt = null;
+        }
+      });
+
+      activeInTextList.forEach(cls => {
+        if (cls in systemDefaults) return;
+        if (savedCustomStylesStore.some(s => s.name === cls)) return;
+
+        if (!(cls in session.userCssStore)) {
+          session.userCssStore[cls] = { rules: '', active: true, expiresAt: null };
+        } else {
+          session.userCssStore[cls].active = true;
+          session.userCssStore[cls].expiresAt = null;
+        }
+      });
+
+      renderCssSidebar();
+      applyAndBroadcastScopedStyles();
+    }
+
+    function startInactiveGarbageCollector() {
+      setInterval(() => {
+        const session = getCurrentSession();
+        if (!session) return;
+
+        const now = Date.now();
+        let needsRedraw = false;
+
+        Object.keys(session.userCssStore).forEach(cls => {
+          const entry = session.userCssStore[cls];
+          if (!entry.active && entry.expiresAt) {
+            const timeLeft = Math.ceil((entry.expiresAt - now) / 1000);
+            if (timeLeft <= 0) {
+              delete session.userCssStore[cls];
+              needsRedraw = true;
+            } else {
+              const timerElem = document.getElementById(`countdown-${cls}`);
+              if (timerElem) timerElem.textContent = `Clearing empty class in ${timeLeft}s...`;
+            }
+          }
+        });
+
+        if (needsRedraw) renderCssSidebar();
+      }, 1000);
+    }
+
+    function switchCssTab(tab) {
+      currentCssTab = tab;
+      document.getElementById('tab-btn-active').classList.toggle('active', tab === 'active');
+      document.getElementById('tab-btn-inactive').classList.toggle('active', tab === 'inactive');
+      
+      const clearInactiveBtn = document.getElementById('btn-clear-inactive');
+      if (clearInactiveBtn) clearInactiveBtn.classList.toggle('show', tab === 'inactive');
+
+      renderCssSidebar();
+    }
+
+    function renderCssSidebar() {
+      const container = document.getElementById('css-class-list');
+      const searchBox = document.getElementById('css-search');
+      if (!container || !searchBox) return;
+
+      const session = getCurrentSession();
+      if (!session) return;
+
+      const searchQuery = searchBox.value.toLowerCase().trim();
+      container.innerHTML = '';
+
+      let activeCount = 0;
+      let inactiveCount = 0;
+
+      Object.keys(session.userCssStore).forEach(cls => {
+        if (session.userCssStore[cls] && session.userCssStore[cls].active) activeCount++;
+        else inactiveCount++;
+      });
+
+      document.getElementById('count-active').textContent = `(${activeCount})`;
+      document.getElementById('count-inactive').textContent = `(${inactiveCount})`;
+
+      const isCurrentActiveTab = (currentCssTab === 'active');
+      const targetClasses = Object.keys(session.userCssStore).filter(cls => {
+        const entry = session.userCssStore[cls];
+        if (!entry) return false;
+        return entry.active === isCurrentActiveTab && cls.toLowerCase().includes(searchQuery);
+      });
+
+      if (targetClasses.length === 0) {
+        container.innerHTML = `<small style="color: var(--text-muted);">No ${isCurrentActiveTab ? 'active' : 'inactive'} custom classes found.</small>`;
+        return;
+      }
+
+      targetClasses.forEach(cls => {
+        const item = document.createElement('div');
+        item.className = `class-item ${!isCurrentActiveTab ? 'inactive' : ''}`;
+        const entry = session.userCssStore[cls] || {};
+        const rules = entry.rules || '';
+        
+        let timeLeftSec = '';
+        if (!isCurrentActiveTab && entry.expiresAt) {
+          const rem = Math.ceil((entry.expiresAt - Date.now()) / 1000);
+          if (rem > 0) timeLeftSec = `Clearing empty class in ${rem}s...`;
+        }
+
+        item.innerHTML = `
+          <div class="class-item-header">
+            <span class="class-item-title">.${cls}</span>
+            ${!isCurrentActiveTab ? `<button class="btn-delete-class" title="Delete Class" onclick="deleteClass('${cls}')">&times;</button>` : ''}
+          </div>
+          ${timeLeftSec ? `<div id="countdown-${cls}" class="countdown-notice">${timeLeftSec}</div>` : ''}
+          <textarea placeholder="e.g. /* # li # */\ncolor: gold;" oninput="updateClassStyle('${cls}', this.value)" onfocus="cancelExpiration('${cls}')">${rules}</textarea>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function cancelExpiration(className) {
+      const session = getCurrentSession();
+      if (session && session.userCssStore[className]) {
+        session.userCssStore[className].expiresAt = null;
+        const elem = document.getElementById(`countdown-${className}`);
+        if (elem) elem.remove();
+      }
+    }
+
+    function updateClassStyle(className, styleRules) {
+      const session = getCurrentSession();
+      if (session && session.userCssStore[className]) {
+        session.userCssStore[className].rules = styleRules;
+        cancelExpiration(className);
+        applyAndBroadcastScopedStyles();
+      }
+    }
+
+    function deleteClass(className) {
+      const session = getCurrentSession();
+      if (session && session.userCssStore[className]) {
+        delete session.userCssStore[className];
+        renderCssSidebar();
+        applyAndBroadcastScopedStyles();
+      }
+    }
+
+    function clearAllInactiveClasses() {
+      const session = getCurrentSession();
+      if (!session) return;
+
+      if (confirm("Are you sure you want to flush all unused/empty inactive classes?")) {
+        Object.keys(session.userCssStore).forEach(cls => {
+          const entry = session.userCssStore[cls];
+          if (!entry.active && (!entry.rules || entry.rules.trim() === '')) {
+            delete session.userCssStore[cls];
+          }
+        });
+        renderCssSidebar();
+        applyAndBroadcastScopedStyles();
+      }
+    }
+
+    function applyAndBroadcastScopedStyles() {
+      const session = getCurrentSession();
+      if (!session) return;
+
+      let previewScopedCss = '';
+      let rawClassRules = '';
+
+      const defaults = window.DEFAULT_SYSTEM_CLASSES || {};
+      Object.keys(defaults).forEach(cls => {
+        const parsed = extractHtmlTagAndCleanRules(defaults[cls]);
+        previewScopedCss += `#preview-screen .${cls}, .slide-card .${cls} { ${parsed.rules} }\n`;
+        rawClassRules += `.${cls} { ${parsed.rules} }\n`;
+      });
+
+      savedCustomStylesStore.forEach(item => {
+        if (item.name && item.rules) {
+          const parsed = extractHtmlTagAndCleanRules(item.rules);
+          previewScopedCss += `#preview-screen .${item.name}, .slide-card .${item.name} { ${parsed.rules} }\n`;
+          rawClassRules += `.${item.name} { ${parsed.rules} }\n`;
+        }
+      });
+
+      Object.keys(session.userCssStore).forEach(cls => {
+        const entry = session.userCssStore[cls];
+        if (entry && entry.rules) {
+          const parsed = extractHtmlTagAndCleanRules(entry.rules);
+          if (parsed.rules) {
+            previewScopedCss += `#preview-screen .${cls}, .slide-card .${cls} { ${parsed.rules} }\n`;
+            rawClassRules += `.${cls} { ${parsed.rules} }\n`;
+          }
+        }
+      });
+
+      document.getElementById('dynamic-user-styles').textContent = previewScopedCss;
+      broadcastPayload({ type: 'CSS_UPDATE', cssRules: rawClassRules });
+    }
+
+    function startHeartbeatParser() {
+      setInterval(() => {
+        const session = getCurrentSession();
+        if (session && codeMirrorEditor) {
+          const val = codeMirrorEditor.getValue();
+          if (val !== session.text) {
+            session.text = val;
+            session.parsedSlides = parseSermon(session.text);
+            renderSlideGrid();
+          }
+        }
+      }, 2000);
+    }
+
+    function saveSessionToFile() {
+      const session = getCurrentSession();
+      if (!session) {
+        showToast('There is no active session to save.');
+        return;
+      }
+      const defaultName = `${(session.title || 'session').toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/^_+|_+$/g, '') || 'session'}.bsp`;
+      const dialog = document.getElementById('session-save-dialog');
+      const input = document.getElementById('session-save-filename');
+      input.value = defaultName;
+      dialog.style.display = 'flex';
+      input.focus();
+      input.select();
+    }
+
+    function closeSessionSaveDialog() {
+      document.getElementById('session-save-dialog').style.display = 'none';
+      showToast('Save cancelled.');
+    }
+
+    async function saveSessionWithFilename() {
+      const input = document.getElementById('session-save-filename');
+      let enteredName = (input.value || '').trim().replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/[. ]+$/, '');
+      if (!enteredName) {
+        input.focus();
+        showToast('Please enter a valid filename.');
+        return;
+      }
+      const filename = /\.bsp$/i.test(enteredName) ? enteredName : `${enteredName.replace(/\.[^.]+$/, '')}.bsp`;
+      document.getElementById('session-save-dialog').style.display = 'none';
+
+      const session = getCurrentSession();
+      if (!session) return;
+      const configData = {
+        cssStore: session.userCssStore,
+        bgColor: displayBgColor,
+        alignment: session.alignment
+      };
+      const fileContent = `---BSP_CONFIG_START---\n${JSON.stringify(configData, null, 2)}\n---BSP_CONFIG_END---\n\n${session.text}`;
+
+      if (/OBS/i.test(navigator.userAgent || '')) {
+        showManualSessionSaveDialog(filename, fileContent);
+        return;
+      }
+
+      if (typeof window.showSaveFilePicker === 'function') {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'Sermon Session File', accept: { 'text/plain': ['.bsp', '.txt'] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(fileContent);
+          await writable.close();
+          showToast('Session saved successfully!');
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+
+      try {
+        const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => { link.remove(); URL.revokeObjectURL(objectUrl); }, 15000);
+        showToast('Download requested. Check Downloads to confirm.');
+      } catch (err) {
+        alert('Could not prepare the session download.');
+      }
+    }
+
+    function showManualSessionSaveDialog(filename, fileContent) {
+      document.getElementById('session-manual-save-name').textContent = filename;
+      document.getElementById('session-manual-save-content').value = fileContent;
+      document.getElementById('session-manual-save-dialog').style.display = 'flex';
+    }
+
+    function closeManualSessionSaveDialog() {
+      document.getElementById('session-manual-save-dialog').style.display = 'none';
+    }
+
+    function selectManualSessionContent() {
+      const content = document.getElementById('session-manual-save-content');
+      content.focus();
+      content.select();
+    }
+
+    async function copyManualSessionContent() {
+      const content = document.getElementById('session-manual-save-content');
+      try {
+        await navigator.clipboard.writeText(content.value);
+        showToast('Copied content to clipboard.');
+      } catch (err) {
+        content.select();
+      }
+    }
+
+    function loadSessionFromFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        const configMatch = content.match(/---BSP_CONFIG_START---([\s\S]*?)---BSP_CONFIG_END---/);
+        let sermonText = content;
+        let loadedCssStore = {};
+        let loadedAlign = 'center';
+
+        if (configMatch) {
+          try {
+            const configData = JSON.parse(configMatch[1]);
+            if (configData.cssStore) loadedCssStore = configData.cssStore;
+            if (configData.alignment) loadedAlign = configData.alignment;
+          } catch(err) {}
+          sermonText = content.replace(/---BSP_CONFIG_START---[\s\S]*?---BSP_CONFIG_END---\n*/, '');
+        }
+
+        const fileName = file.name.replace(/\.[^/.]+\$/, "");
+        const newId = 'sess_' + Math.random().toString(36).substr(2, 9);
+        const newSession = {
+          id: newId,
+          title: fileName,
+          text: sermonText,
+          parsedSlides: [],
+          activeSlideIndex: -1,
+          alignment: loadedAlign,
+          userCssStore: loadedCssStore,
+          history: [sermonText],
+          historyIndex: 0
+        };
+
+        sessions.push(newSession);
+        switchSession(newId);
+      };
+      reader.readAsText(file);
+    }
+
+    function handleEditorInput(isInit = false) {
+      const session = getCurrentSession();
+      if (!codeMirrorEditor || !session) return;
+
+      session.text = codeMirrorEditor.getValue();
+
+      if (!isInit) {
+        const currentHistState = session.history[session.historyIndex];
+        if (session.text !== currentHistState) {
+          session.history = session.history.slice(0, session.historyIndex + 1);
+          session.history.push(session.text);
+          session.historyIndex++;
+        }
+      }
+
+      session.parsedSlides = parseSermon(session.text);
+      renderSlideGrid();
+
+      if (session.activeSlideIndex >= 0 && session.activeSlideIndex < session.parsedSlides.length) {
+        selectSlide(session.activeSlideIndex, true);
+      }
+    }
+
+    function jumpToCursorSlide() {
+      const session = getCurrentSession();
+      if (!session || !codeMirrorEditor || session.parsedSlides.length === 0) return;
+
+      const cursor = codeMirrorEditor.getCursor();
+      const textUpToCursor = codeMirrorEditor.getRange({line: 0, ch: 0}, cursor);
+      const matches = textUpToCursor.match(/^##\s+/gm);
+      const targetSlideIndex = matches ? matches.length - 1 : 0;
+
+      if (targetSlideIndex >= 0 && targetSlideIndex < session.parsedSlides.length) {
+        selectSlide(targetSlideIndex);
+      }
+    }
+
+    function handleCursorActivity() {
+      if (autoSyncCursorActive) jumpToCursorSlide();
+    }
+
+    function toggleAutoSyncCursor() {
+      autoSyncCursorActive = !autoSyncCursorActive;
+      const btn = document.getElementById('auto-sync-toggle-btn');
+      if (btn) {
+        btn.classList.toggle('active', autoSyncCursorActive);
+        btn.innerHTML = `<span id="icon-autosync"></span> Auto-Sync: ${autoSyncCursorActive ? 'ON' : 'OFF'}`;
+        renderIcons();
+      }
+    }
+
+    function renderSlideGrid() {
+      const session = getCurrentSession();
+      const gridContainer = document.getElementById('slide-grid');
+      if (!gridContainer || !session) return;
+
+      gridContainer.innerHTML = '';
+      session.parsedSlides.forEach((slide, index) => {
+        const card = document.createElement('div');
+        card.className = `slide-card ${index === session.activeSlideIndex ? 'active' : ''}`;
+
+        card.innerHTML = `
+          <div class="slide-card-number">${index + 1}</div>
+          <div class="slide-card-viewport">
+            <div class="slide-card-canvas">
+              <div class="slide-card-screen">
+                <div class="title" style="text-align: ${session.alignment}; display: none;">${slide.htmlTitle}</div>
+                <div class="content" style="text-align: ${session.alignment};">${slide.htmlBody}</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const cardViewport = card.querySelector('.slide-card-viewport');
+        const cardCanvas = card.querySelector('.slide-card-canvas');
+        const cardScreen = card.querySelector('.slide-card-screen');
+        // The canvas is the 1280x720 containing block for both FullScreen and
+        // PartScreen absolute positioning, matching Display.html's coordinate space.
+        if (cardCanvas) {
+          cardCanvas.style.position = 'absolute';
+          cardCanvas.style.width = '1280px';
+          cardCanvas.style.height = '720px';
+        }
+        window.BibleSermonDisplayRenderer.setScreenConfig(cardScreen, currentScreenConfig, { static: true });
+        if (currentBgImageConfig.enabled && currentBgImageConfig.dataUrl) {
+          window.BibleSermonDisplayRenderer.setBackground(cardViewport, currentBgImageConfig, displayBgColor);
+        } else if (currentBgMode === 'picker') {
+          cardViewport.style.backgroundColor = displayBgColor;
+        } else if (currentBgMode === 'css') {
+          // Mirror the display's CSS background mode when no uploaded image is active.
+          cardViewport.style.cssText = customBgCssValue || '';
+        }
+
+        window.BibleSermonDisplayRenderer.setSlide(card, {
+          title: slide.htmlTitle,
+          content: slide.htmlBody,
+          align: session.alignment
+        }, {});
+        card.addEventListener('click', () => selectSlide(index));
+        gridContainer.appendChild(card);
+      });
+
+      scaleSlideCardCanvases();
+      observeSlideCardGridResize();
+    }
+
+    function scaleSlideCardCanvases() {
+      document.querySelectorAll('.slide-card').forEach(card => {
+        const viewport = card.querySelector('.slide-card-viewport');
+        const canvas = card.querySelector('.slide-card-canvas');
+        if (!viewport || !canvas) return;
+
+        // Explicitly size the card from its rendered width. This avoids CSS Grid
+        // collapsing implicit rows when the thumbnail content is absolutely positioned.
+        const cardWidth = card.clientWidth;
+        if (!cardWidth) return;
+        const cardHeight = cardWidth * 9 / 16;
+        card.style.height = `${cardHeight}px`;
+
+        const width = viewport.clientWidth;
+        const height = viewport.clientHeight;
+        if (!width || !height) return;
+        const scale = Math.min(width / 1280, height / 720);
+        canvas.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      });
+    }
+
+    let slideCardResizeObserver = null;
+    function observeSlideCardGridResize() {
+      const grid = document.getElementById('slide-grid');
+      if (!grid || typeof ResizeObserver === 'undefined') return;
+      if (slideCardResizeObserver) slideCardResizeObserver.disconnect();
+      slideCardResizeObserver = new ResizeObserver(() => scaleSlideCardCanvases());
+      slideCardResizeObserver.observe(grid);
+    }
+    window.addEventListener('resize', scaleSlideCardCanvases);
+
+    function selectSlide(index, isAutoSync = false) {
+      const session = getCurrentSession();
+      if (!session || index < 0 || index >= session.parsedSlides.length) return;
+
+      session.activeSlideIndex = index;
+      if (!isAutoSync) renderSlideGrid();
+
+      document.querySelectorAll('.slide-card')[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      const slide = session.parsedSlides[index];
+      const titleElem = document.getElementById('live-preview-title');
+      const bodyElem = document.getElementById('live-preview-body');
+      const previewContainer = document.getElementById('preview-display-container');
+
+      const partField = document.getElementById('partscreen-css');
+      const fullField = document.getElementById('fullscreen-css');
+      if (partField) currentScreenConfig.partCss = partField.value;
+      if (fullField) currentScreenConfig.fullCss = fullField.value;
+      applyPreviewScreenConfig(currentScreenConfig);
+
+      const durationValue = parseInt(currentAnimationConfig?.duration ?? 0, 10);
+      const duration = Number.isFinite(durationValue) ? Math.max(0, durationValue) : 0;
+      const updatePreviewText = () => {
+        if (slide.htmlTitle) {
+          titleElem.innerHTML = slide.htmlTitle;
+          titleElem.style.display = 'none';
+        } else {
+          titleElem.innerHTML = '';
+          titleElem.style.display = 'none';
+        }
+        titleElem.style.textAlign = session.alignment;
+        bodyElem.innerHTML = slide.htmlBody;
+        bodyElem.style.textAlign = session.alignment;
+      };
+
+      if (previewFadeTimer !== null) {
+        clearTimeout(previewFadeTimer);
+        previewFadeTimer = null;
+      }
+
+      if (duration > 0 && previewContainer) {
+        previewContainer.style.transition = `opacity ${duration}ms ease`;
+        previewContainer.style.opacity = '0';
+        previewFadeTimer = setTimeout(() => {
+          updatePreviewText();
+          previewContainer.style.opacity = '1';
+          previewFadeTimer = null;
+        }, duration);
+      } else {
+        if (previewContainer) {
+          previewContainer.style.transition = 'none';
+          previewContainer.style.opacity = '1';
+        }
+        updatePreviewText();
+      }
+
+      broadcastPayload({
+        type: 'UPDATE',
+        title: slide.htmlTitle || '',
+        content: slide.htmlBody,
+        align: session.alignment,
+        bgColor: currentBgMode === 'css' ? '' : displayBgColor,
+        animation: currentAnimationConfig,
+        screenConfig: currentScreenConfig
+      });
+    }
+
+    function clearLiveDisplay() {
+      const session = getCurrentSession();
+      if (session) session.activeSlideIndex = -1;
+      renderSlideGrid();
+      const titleElem = document.getElementById('live-preview-title');
+      titleElem.innerHTML = '';
+      titleElem.style.display = 'none';
+      document.getElementById('live-preview-body').innerHTML = '';
+      
+      const partField = document.getElementById('partscreen-css');
+      const fullField = document.getElementById('fullscreen-css');
+      if (partField) currentScreenConfig.partCss = partField.value;
+      if (fullField) currentScreenConfig.fullCss = fullField.value;
+
+      broadcastPayload({ type: 'CLEAR', animation: currentAnimationConfig, screenConfig: currentScreenConfig });
+    }
+
+    function nextSlide() {
+      const session = getCurrentSession();
+      if (session && session.activeSlideIndex < session.parsedSlides.length - 1) {
+        selectSlide(session.activeSlideIndex + 1);
+      }
+    }
+
+    function prevSlide() {
+      const session = getCurrentSession();
+      if (session && session.activeSlideIndex > 0) {
+        selectSlide(session.activeSlideIndex - 1);
+      }
+    }
+
+    function getGridColumnCount() {
+      const grid = document.getElementById('slide-grid');
+      if (!grid) return 1;
+      const styles = window.getComputedStyle(grid);
+      const cols = styles.getPropertyValue('grid-template-columns').split(' ').length;
+      return cols > 0 ? cols : 1;
+    }
+
+    function navigateGrid(direction) {
+      const session = getCurrentSession();
+      if (!session || session.parsedSlides.length === 0) return;
+      if (session.activeSlideIndex < 0) {
+        selectSlide(0);
+        return;
+      }
+      const cols = getGridColumnCount();
+      let targetIndex = session.activeSlideIndex;
+
+      if (direction === 'up') {
+        targetIndex -= cols;
+        if (targetIndex < 0) targetIndex = 0;
+      } else if (direction === 'down') {
+        targetIndex += cols;
+        if (targetIndex >= session.parsedSlides.length) {
+          targetIndex = session.parsedSlides.length - 1;
+        }
+      }
+      selectSlide(targetIndex);
+    }
+
+    function toggleShowHideSlide() {
+      const session = getCurrentSession();
+      if (!session || session.parsedSlides.length === 0) return;
+      const previewBody = document.getElementById('live-preview-body');
+      if (previewBody.innerHTML.trim() !== '') {
+        clearLiveDisplay();
+        showToast("Slide hidden");
+      } else {
+        if (session.activeSlideIndex < 0) session.activeSlideIndex = 0;
+        selectSlide(session.activeSlideIndex);
+        showToast("Slide shown");
+      }
+    }
+
+    function broadcastPayload(payload) {
+      try {
+        const storedSeq = parseInt(localStorage.getItem('bible_sermon_pro_sequence_v1') || '0', 10);
+        sequenceNumber = Math.max(sequenceNumber, Number.isFinite(storedSeq) ? storedSeq : 0) + 1;
+        localStorage.setItem('bible_sermon_pro_sequence_v1', String(sequenceNumber));
+      } catch (e) {
+        sequenceNumber++;
+      }
+
+      const fullMessage = {
+        ...payload,
+        seq: sequenceNumber,
+        sessionId: sessionId,
+        timestamp: Date.now()
+      };
+
+      if (channel) {
+        try { channel.postMessage(fullMessage); } catch (e) {}
+      }
+
+      try {
+        localStorage.setItem('bible_sermon_pro_broadcast_v1', JSON.stringify(fullMessage));
+        if (payload.type === 'UPDATE' || payload.type === 'CLEAR') {
+          localStorage.setItem('bible_sermon_pro_current_state_v1', JSON.stringify(fullMessage));
+        }
+      } catch (e) {}
+    }
+
+    function switchMainTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+
+      // Refresh CodeMirror when switching to the edit tab so it renders immediately
+      if (tabName === 'edit' && codeMirrorEditor) {
+        setTimeout(() => {
+          codeMirrorEditor.refresh();
+          updateEditorScopeHighlights();
+        }, 10);
+      }
+    }
+
+    function formatText(type) {
+      if (!codeMirrorEditor) return;
+      const selected = codeMirrorEditor.getSelection();
+
+      let prefix = '', suffix = '';
+      if (type === 'bold') { prefix = '**'; suffix = '**'; }
+      if (type === 'italic') { prefix = '_'; suffix = '_'; }
+      if (type === 'underline') { prefix = '__'; suffix = '__'; }
+      if (type === 'bullet') { prefix = '* '; }
+
+      codeMirrorEditor.replaceSelection(prefix + (selected || 'text') + suffix);
+      codeMirrorEditor.focus();
+    }
+
+    function setAlignment(align) {
+      const session = getCurrentSession();
+      if (session) {
+        session.alignment = align;
+        if (session.activeSlideIndex >= 0) selectSlide(session.activeSlideIndex, true);
+      }
+    }
+
+    function insertHeader() {
+      if (!codeMirrorEditor) return;
+      codeMirrorEditor.replaceSelection("\n\n## New Slide Title\n");
+      codeMirrorEditor.focus();
+    }
+
+    function undoSession() {
+      const session = getCurrentSession();
+      if (session && session.historyIndex > 0) {
+        session.historyIndex--;
+        codeMirrorEditor.setValue(session.history[session.historyIndex]);
+        handleEditorInput(true);
+        updateEditorScopeHighlights();
+      }
+    }
+
+    function redoSession() {
+      const session = getCurrentSession();
+      if (session && session.historyIndex < session.history.length - 1) {
+        session.historyIndex++;
+        codeMirrorEditor.setValue(session.history[session.historyIndex]);
+        handleEditorInput(true);
+        updateEditorScopeHighlights();
+      }
+    }
+
+    function applyBgColor(colorValue, save = true) {
+      if (currentBgMode !== 'picker') return;
+      const rgbaColor = normalizeSettingsColorToRgba(colorValue);
+      displayBgColor = rgbaColor;
+      const bgPickerInput = document.getElementById('bg-color-picker-element');
+      if (bgPickerInput && bgPickerInput.value !== rgbaColor) bgPickerInput.value = rgbaColor;
+      applyPreviewBackgroundImage();
+      renderSlideGrid();
+      if (save) localStorage.setItem('bsp_display_bg', rgbaColor);
+      broadcastPayload({ type: 'COLOR_UPDATE', bgColor: rgbaColor });
+    }
+
+    function setupKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        const isLiveActive = document.getElementById('tab-live').classList.contains('active');
+        if (!isLiveActive) return;
+        if (document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) return;
+
+        const session = getCurrentSession();
+        if (!session) return;
+
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          prevSlide();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          nextSlide();
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          toggleShowHideSlide();
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          if (session.parsedSlides.length > 0) selectSlide(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          if (session.parsedSlides.length > 0) selectSlide(session.parsedSlides.length - 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          navigateGrid('up');
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          navigateGrid('down');
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          clearLiveDisplay();
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    //Make preview draggable
+    document.addEventListener('DOMContentLoaded', () => {
+      const previewCol = document.getElementById('preview-col');
+      const header = previewCol?.querySelector('.preview-box-header');
+
+      if (!previewCol || !header) return;
+
+      let isDragging = false;
+      let startX = 0, startY = 0;
+      let initialLeft = 0, initialTop = 0;
+
+      header.style.cursor = 'grab';
+
+      header.addEventListener('mousedown', (e) => {
+        // Prevent dragging if clicking input elements inside the header
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+
+        isDragging = true;
+        header.style.cursor = 'grabbing';
+
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const rect = previewCol.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        // Switch from CSS bottom/right alignment to fixed explicit px coordinates
+        previewCol.style.bottom = 'auto';
+        previewCol.style.right = 'auto';
+        previewCol.style.left = `${initialLeft}px`;
+        previewCol.style.top = `${initialTop}px`;
+
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        // Keep it within window bounds optionally
+        const maxLeft = window.innerWidth - previewCol.offsetWidth;
+        const maxTop = window.innerHeight - previewCol.offsetHeight;
+
+        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        newTop = Math.max(0, Math.min(newTop, maxTop));
+
+        previewCol.style.left = `${newLeft}px`;
+        previewCol.style.top = `${newTop}px`;
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          header.style.cursor = 'grab';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
